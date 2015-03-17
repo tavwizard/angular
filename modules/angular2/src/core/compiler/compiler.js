@@ -12,11 +12,11 @@ import {createDefaultSteps} from './pipeline/default_steps';
 import {TemplateLoader} from './template_loader';
 import {TemplateResolver} from './template_resolver';
 import {Template} from '../annotations/template';
-import {ShadowDomStrategy} from './shadow_dom_strategy';
+import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {CompileStep} from './pipeline/compile_step';
 import {ComponentUrlMapper} from './component_url_mapper';
 import {UrlResolver} from './url_resolver';
-import {CssProcessor} from './css_processor';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 /**
  * Cache that stores the ProtoView of the template of a component.
@@ -168,10 +168,10 @@ export class Compiler {
       }
     }
 
-    if (protoView.stylePromises.length > 0) {
+    if (protoView.render.stylePromises.length > 0) {
       // The protoView is ready after all asynchronous styles are ready
       var syncProtoView = protoView;
-      protoView = PromiseWrapper.all(syncProtoView.stylePromises).then((_) => syncProtoView);
+      protoView = PromiseWrapper.all(syncProtoView.render.stylePromises).then((_) => syncProtoView);
     }
 
     if (nestedPVPromises.length > 0) {
@@ -179,7 +179,7 @@ export class Compiler {
       // The promise will resolved after nested ProtoViews are compiled.
       return PromiseWrapper.then(PromiseWrapper.all(nestedPVPromises),
         (_) => protoView,
-        (e) => { throw new BaseException(`${e.message} -> Failed to compile ${stringify(component)}`); }
+        (e) => { throw new BaseException(`${e} -> Failed to compile ${stringify(component)}`); }
       );
     }
 

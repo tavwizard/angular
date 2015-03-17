@@ -1,4 +1,3 @@
-import {DOM} from 'angular2/src/dom/dom_adapter';
 import {Promise} from 'angular2/src/facade/async';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 import {AST, Locals, ChangeDispatcher, ProtoChangeDetector, ChangeDetector,
@@ -11,16 +10,14 @@ import {DirectiveMetadata} from './directive_metadata';
 import {SetterFn} from 'angular2/src/reflection/types';
 import {IMPLEMENTS, int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
 import {Injector} from 'angular2/di';
-import {NgElement} from 'angular2/src/core/dom/element';
+import {NgElement} from 'angular2/src/render/ng_element';
 import {ViewContainer} from './view_container';
-import {LightDom} from './shadow_dom_emulation/light_dom';
-import {Content} from './shadow_dom_emulation/content_tag';
-import {ShadowDomStrategy} from './shadow_dom_strategy';
 import {ViewPool} from './view_pool';
-import {EventManager} from 'angular2/src/core/events/event_manager';
+import {EventManager} from 'angular2/src/render/events/event_manager';
 
-const NG_BINDING_CLASS = 'ng-binding';
-const NG_BINDING_CLASS_SELECTOR = '.ng-binding';
+import {ProtoRenderView, RenderView} from 'angular2/src/render/render_view';
+import {RenderViewContainer} from 'angular2/src/render/render_view_container';
+import {RenderElementBinder} from 'angular2/src/render/render_element_binder';
 
 // TODO(rado): make this configurable/smarter.
 var VIEW_POOL_CAPACITY = 10000;
@@ -35,50 +32,36 @@ export class View {
   /// This list matches the _nodes list. It is sparse, since only Elements have ElementInjector
   rootElementInjectors:List<ElementInjector>;
   elementInjectors:List<ElementInjector>;
-  bindElements:List;
-  textNodes:List;
   changeDetector:ChangeDetector;
-  /// When the view is part of render tree, the DocumentFragment is empty, which is why we need
-  /// to keep track of the nodes.
-  nodes:List;
   componentChildViews: List<View>;
   viewContainers: List<ViewContainer>;
-  contentTags: List<Content>;
   preBuiltObjects: List<PreBuiltObjects>;
-  lightDoms: List<LightDom>;
   proto: ProtoView;
   context: any;
   locals:Locals;
+  render:RenderView;
 
-  constructor(proto:ProtoView, nodes:List, protoLocals:Map) {
+  constructor(renderView:RenderView, proto:ProtoView, protoLocals:Map) {
+    this.render = renderView;
     this.proto = proto;
-    this.nodes = nodes;
     this.changeDetector = null;
     this.elementInjectors = null;
     this.rootElementInjectors = null;
-    this.textNodes = null;
-    this.bindElements = null;
     this.componentChildViews = null;
     this.viewContainers = null;
-    this.contentTags = null;
     this.preBuiltObjects = null;
-    this.lightDoms = null;
     this.context = null;
     this.locals = new Locals(null, MapWrapper.clone(protoLocals)); //TODO optimize this
   }
 
-  init(changeDetector:ChangeDetector, elementInjectors:List, rootElementInjectors:List, textNodes: List, bindElements:List,
-    viewContainers:List, contentTags:List, preBuiltObjects:List, componentChildViews:List, lightDoms:List<LightDom>) {
+  init(changeDetector:ChangeDetector, elementInjectors:List, rootElementInjectors:List,
+    viewContainers:List, preBuiltObjects:List, componentChildViews:List) {
     this.changeDetector = changeDetector;
     this.elementInjectors = elementInjectors;
     this.rootElementInjectors = rootElementInjectors;
-    this.textNodes = textNodes;
-    this.bindElements = bindElements;
     this.viewContainers = viewContainers;
-    this.contentTags = contentTags;
     this.preBuiltObjects = preBuiltObjects;
     this.componentChildViews = componentChildViews;
-    this.lightDoms = lightDoms;
   }
 
   setLocal(contextName: string, value) {
@@ -124,7 +107,7 @@ export class View {
    * A call to hydrate/dehydrate does not attach/detach the view from the view
    * tree.
    */
-  hydrate(appInjector: Injector, hostElementInjector: ElementInjector, hostLightDom: LightDom,
+  hydrate(appInjector: Injector, hostElementInjector: ElementInjector,
       context: Object, locals:Locals) {
     if (this.hydrated()) throw new BaseException('The view is already hydrated.');
     this._hydrateContext(context, locals);
@@ -133,7 +116,7 @@ export class View {
     for (var i = 0; i < this.viewContainers.length; i++) {
       var vc = this.viewContainers[i];
       if (isPresent(vc)) {
-        vc.hydrate(appInjector, hostElementInjector, hostLightDom);
+        vc.hydrate(appInjector, hostElementInjector);
       }
     }
 
@@ -173,14 +156,7 @@ export class View {
 
       if (isPresent(binders[i].nestedProtoView) && isPresent(componentDirective)) {
         this.componentChildViews[componentChildViewIndex++].hydrate(shadowDomAppInjector,
-          elementInjector, this.lightDoms[i], elementInjector.getComponent(), null);
-      }
-    }
-
-    for (var i = 0; i < this.lightDoms.length; ++i) {
-      var lightDom = this.lightDoms[i];
-      if (isPresent(lightDom)) {
-        lightDom.redistribute();
+          elementInjector, elementInjector.getComponent(), null);
       }
     }
   }
@@ -261,12 +237,11 @@ export class View {
 
     } else if (memento instanceof ElementBindingMemento) {
       var elementMemento:ElementBindingMemento = memento;
-      elementMemento.invoke(record, this.bindElements);
-
+      elementMemento.invoke(record, this.render);
     } else {
       // we know it refers to _textNodes.
       var textNodeIndex:number = memento;
-      DOM.setText(this.textNodes[textNodeIndex], record.currentValue);
+      this.render.setText(textNodeIndex, record.currentValue);
     }
   }
 
@@ -285,59 +260,47 @@ export class View {
  * @publicModule angular2/angular2
  */
 export class ProtoView {
-  element;
   elementBinders:List<ElementBinder>;
   protoChangeDetector:ProtoChangeDetector;
   variableBindings: Map;
   protoLocals:Map;
   textNodesWithBindingCount:int;
-  elementsWithBindingCount:int;
-  instantiateInPlace:boolean;
-  rootBindingOffset:int;
-  isTemplateElement:boolean;
-  shadowDomStrategy: ShadowDomStrategy;
   _viewPool: ViewPool;
-  stylePromises: List<Promise>;
   // List<Map<eventName, handler>>, indexed by binder index
   eventHandlers:List;
   bindingRecords:List;
   parentProtoView:ProtoView;
   _variableBindings:List;
+  render:ProtoRenderView;
 
   constructor(
-      template,
+      protoRenderView: ProtoRenderView,
       protoChangeDetector:ProtoChangeDetector,
-      shadowDomStrategy:ShadowDomStrategy, parentProtoView:ProtoView = null) {
-    this.element = template;
+      parentProtoView:ProtoView = null) {
+    this.render = protoRenderView;
     this.elementBinders = [];
     this.variableBindings = MapWrapper.create();
     this.protoLocals = MapWrapper.create();
     this.protoChangeDetector = protoChangeDetector;
     this.parentProtoView = parentProtoView;
     this.textNodesWithBindingCount = 0;
-    this.elementsWithBindingCount = 0;
-    this.instantiateInPlace = false;
-    this.rootBindingOffset = (isPresent(this.element) && DOM.hasClass(this.element, NG_BINDING_CLASS))
-      ? 1 : 0;
-    this.isTemplateElement = DOM.isTemplateElement(this.element);
-    this.shadowDomStrategy = shadowDomStrategy;
     this._viewPool = new ViewPool(VIEW_POOL_CAPACITY);
-    this.stylePromises = [];
     this.eventHandlers = [];
     this.bindingRecords = [];
     this._variableBindings = null;
   }
 
   // TODO(rado): hostElementInjector should be moved to hydrate phase.
-  instantiate(hostElementInjector: ElementInjector, eventManager: EventManager):View {
+  instantiate(renderView:RenderView, hostElementInjector: ElementInjector, eventManager: EventManager):View {
     if (this._viewPool.length() == 0) this._preFillPool(hostElementInjector, eventManager);
     var view = this._viewPool.pop();
-    return isPresent(view) ? view : this._instantiate(hostElementInjector, eventManager);
+    return isPresent(view) ? view : this._instantiate(renderView, hostElementInjector, eventManager);
   }
 
   _preFillPool(hostElementInjector: ElementInjector, eventManager: EventManager) {
     for (var i = 0; i < VIEW_POOL_PREFILL; i++) {
-      this._viewPool.push(this._instantiate(hostElementInjector, eventManager));
+      var renderView = this.renderProtoView.instantiate(eventManager);
+      this._viewPool.push(this._instantiate(renderView, hostElementInjector, eventManager));
     }
   }
 
@@ -358,55 +321,20 @@ export class ProtoView {
     return this._variableBindings;
   }
 
-  _instantiate(hostElementInjector: ElementInjector, eventManager: EventManager): View {
-    var rootElementClone = this.instantiateInPlace ? this.element : DOM.importIntoDoc(this.element);
-    var elementsWithBindingsDynamic;
-    if (this.isTemplateElement) {
-      elementsWithBindingsDynamic = DOM.querySelectorAll(DOM.content(rootElementClone), NG_BINDING_CLASS_SELECTOR);
-    } else {
-      elementsWithBindingsDynamic= DOM.getElementsByClassName(rootElementClone, NG_BINDING_CLASS);
-    }
-
-    var elementsWithBindings = ListWrapper.createFixedSize(elementsWithBindingsDynamic.length);
-    for (var binderIdx = 0; binderIdx < elementsWithBindingsDynamic.length; ++binderIdx) {
-      elementsWithBindings[binderIdx] = elementsWithBindingsDynamic[binderIdx];
-    }
-
-    var viewNodes;
-    if (this.isTemplateElement) {
-      var childNode = DOM.firstChild(DOM.content(rootElementClone));
-      viewNodes = []; // TODO(perf): Should be fixed size, since we could pre-compute in in ProtoView
-      // Note: An explicit loop is the fastest way to convert a DOM array into a JS array!
-      while(childNode != null) {
-        ListWrapper.push(viewNodes, childNode);
-        childNode = DOM.nextSibling(childNode);
-      }
-    } else {
-      viewNodes = [rootElementClone];
-    }
-
-    var view = new View(this, viewNodes, this.protoLocals);
+  _instantiate(renderView:RenderView, hostElementInjector: ElementInjector, eventManager: EventManager): View {
+    var view = new View(renderView, this, this.protoLocals);
     var changeDetector = this.protoChangeDetector.instantiate(view, this.bindingRecords, this._getVariableBindings());
     var binders = this.elementBinders;
     var elementInjectors = ListWrapper.createFixedSize(binders.length);
     var eventHandlers = ListWrapper.createFixedSize(binders.length);
     var rootElementInjectors = [];
-    var textNodes = [];
-    var elementsWithPropertyBindings = [];
     var preBuiltObjects = ListWrapper.createFixedSize(binders.length);
     var viewContainers = ListWrapper.createFixedSize(binders.length);
-    var contentTags = ListWrapper.createFixedSize(binders.length);
     var componentChildViews = [];
-    var lightDoms = ListWrapper.createFixedSize(binders.length);
 
     for (var binderIdx = 0; binderIdx < binders.length; binderIdx++) {
       var binder = binders[binderIdx];
-      var element;
-      if (binderIdx === 0 && this.rootBindingOffset === 1) {
-        element = rootElementClone;
-      } else {
-        element = elementsWithBindings[binderIdx - this.rootBindingOffset];
-      }
+      var element = renderView.boundElements[binderIdx];
       var elementInjector = null;
 
       // elementInjectors and rootElementInjectors
@@ -422,58 +350,30 @@ export class ProtoView {
       }
       elementInjectors[binderIdx] = elementInjector;
 
-      if (binder.hasElementPropertyBindings) {
-        ListWrapper.push(elementsWithPropertyBindings, element);
-      }
-
-      // textNodes
-      var textNodeIndices = binder.textNodeIndices;
-      if (isPresent(textNodeIndices)) {
-        var childNode = DOM.firstChild(DOM.templateAwareRoot(element));
-        for (var j = 0, k = 0; j < textNodeIndices.length; j++) {
-          for(var index = textNodeIndices[j]; k < index; k++) {
-            childNode = DOM.nextSibling(childNode);
-          }
-          ListWrapper.push(textNodes, childNode);
-        }
-      }
-
       // componentChildViews
-      var lightDom = null;
       var bindingPropagationConfig = null;
       if (isPresent(binder.nestedProtoView) && isPresent(binder.componentDirective)) {
-        var strategy = this.shadowDomStrategy;
-        var childView = binder.nestedProtoView.instantiate(elementInjector, eventManager);
+        var childRenderView = binder.nestedProtoView.render.instantiate(eventManager);
+        var childView = binder.nestedProtoView.instantiate(
+          childRenderView, elementInjector, eventManager
+        );
+        renderView.setComponentView(binderIdx, childRenderView);
         changeDetector.addChild(childView.changeDetector);
-
-        lightDom = strategy.constructLightDom(view, childView, element);
-        strategy.attachTemplate(element, childView);
 
         bindingPropagationConfig = new BindingPropagationConfig(changeDetector);
 
         ListWrapper.push(componentChildViews, childView);
       }
-      lightDoms[binderIdx] = lightDom;
-      
-      var destLightDom = null;
-      if (isPresent(binder.parent) && binder.distanceToParent === 1) {
-        destLightDom = lightDoms[binder.parent.index];
-      }
 
       // viewContainers
       var viewContainer = null;
       if (isPresent(binder.viewportDirective)) {
-        viewContainer = new ViewContainer(view, element, binder.nestedProtoView, elementInjector,
-          eventManager, destLightDom);
+        viewContainer = new ViewContainer(
+          renderView.viewContainers[binderIdx], view, binder.nestedProtoView,
+          elementInjector, eventManager
+        );
       }
       viewContainers[binderIdx] = viewContainer;
-
-      // contentTags
-      var contentTag = null;
-      if (isPresent(binder.contentTagSelector)) {
-        contentTag = new Content(destLightDom, element, binder.contentTagSelector);
-      }
-      contentTags[binderIdx] = contentTag;
 
       // preBuiltObjects
       if (isPresent(elementInjector)) {
@@ -488,7 +388,7 @@ export class ProtoView {
           var handler = ProtoView.buildEventHandler(eventMap, binderIdx);
           StringMapWrapper.set(eventHandlers[binderIdx], eventName, handler);
           if (isBlank(elementInjector) || !elementInjector.hasEventEmitter(eventName)) {
-            eventManager.addEventListener(element, eventName,
+            renderView.listen(binderIdx, eventName,
               (event) => { handler(event, view); });
           }
         });
@@ -497,8 +397,8 @@ export class ProtoView {
 
     this.eventHandlers = eventHandlers;
 
-    view.init(changeDetector, elementInjectors, rootElementInjectors, textNodes, elementsWithPropertyBindings,
-      viewContainers, contentTags, preBuiltObjects, componentChildViews, lightDoms);
+    view.init(changeDetector, elementInjectors, rootElementInjectors,
+      viewContainers, preBuiltObjects, componentChildViews);
 
     return view;
   }
@@ -540,10 +440,11 @@ export class ProtoView {
     MapWrapper.set(this.protoLocals, templateName, null);
   }
 
-  bindElement(parent:ElementBinder, distanceToParent:int, protoElementInjector:ProtoElementInjector,
+  bindElement(renderElementBinder:RenderElementBinder, protoElementInjector:ProtoElementInjector,
       componentDirective:DirectiveMetadata = null, viewportDirective:DirectiveMetadata = null):ElementBinder {
-    var elBinder = new ElementBinder(this.elementBinders.length, parent, distanceToParent, 
-        protoElementInjector, componentDirective, viewportDirective);
+    var elBinder = new ElementBinder(
+      renderElementBinder, protoElementInjector, componentDirective, viewportDirective
+    );
     ListWrapper.push(this.elementBinders, elBinder);
     return elBinder;
   }
@@ -552,6 +453,7 @@ export class ProtoView {
    * Adds a text node binding for the last created ElementBinder via bindElement
    */
   bindTextNode(indexInParent:int, expression:AST) {
+    this.render.bindTextNode(indexInParent);
     var elBinder = this.elementBinders[this.elementBinders.length-1];
     if (isBlank(elBinder.textNodeIndices)) {
       elBinder.textNodeIndices = ListWrapper.create();
@@ -566,11 +468,7 @@ export class ProtoView {
    */
   bindElementProperty(expression:AST, setterName:string, setter:SetterFn) {
     var elBinder = this.elementBinders[this.elementBinders.length-1];
-    if (!elBinder.hasElementPropertyBindings) {
-      elBinder.hasElementPropertyBindings = true;
-      this.elementsWithBindingCount++;
-    }
-    var memento = new ElementBindingMemento(this.elementsWithBindingCount-1, setterName, setter);
+    var memento = new ElementBindingMemento(this.elementBinders.length-1, setterName, setter);
     ListWrapper.push(this.bindingRecords, new BindingRecord(expression, memento, null));
   }
 
@@ -624,22 +522,20 @@ export class ProtoView {
   // Create a rootView as if the compiler encountered <rootcmp></rootcmp>,
   // and the component template is already compiled into protoView.
   // Used for bootstrapping.
-  static createRootProtoView(protoView: ProtoView,
-      insertionElement,
+  static createRootProtoView(
+      rootProtoRenderView: ProtoRenderView,
+      protoView: ProtoView,
       rootComponentAnnotatedType: DirectiveMetadata,
-      protoChangeDetector:ProtoChangeDetector,
-      shadowDomStrategy: ShadowDomStrategy
+      protoChangeDetector:ProtoChangeDetector
   ): ProtoView {
 
-    DOM.addClass(insertionElement, NG_BINDING_CLASS);
     var cmpType = rootComponentAnnotatedType.type;
-    var rootProtoView = new ProtoView(insertionElement, protoChangeDetector, shadowDomStrategy);
-    rootProtoView.instantiateInPlace = true;
-    var binder = rootProtoView.bindElement(null, 0,
-        new ProtoElementInjector(null, 0, [cmpType], true));
+    var rootProtoView = new ProtoView(rootProtoRenderView, protoChangeDetector);
+    var binder = rootProtoView.bindElement(
+      new ProtoElementInjector(null, 0, [cmpType], true)
+    );
     binder.componentDirective = rootComponentAnnotatedType;
     binder.nestedProtoView = protoView;
-    shadowDomStrategy.shimAppElement(rootComponentAnnotatedType, insertionElement);
     return rootProtoView;
   }
 }
@@ -657,9 +553,8 @@ export class ElementBindingMemento {
     this._setter = setter;
   }
 
-  invoke(record:ChangeRecord, bindElements:List) {
-    var element = bindElements[this._elementIndex];
-    this._setter(element, record.currentValue);
+  invoke(record:ChangeRecord, renderView:RenderView) {
+    renderView.setElementProperty(this._elementIndex, this._setterName, this._setter, record.currentValue);
   }
 }
 

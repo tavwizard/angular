@@ -21,7 +21,7 @@ import {Lexer, Parser, dynamicChangeDetection,
 
 import {Compiler, CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
-import {ShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {PrivateComponentLocation} from 'angular2/src/core/compiler/private_component_location';
 import {PrivateComponentLoader} from 'angular2/src/core/compiler/private_component_loader';
 import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
@@ -29,9 +29,9 @@ import {MockTemplateResolver} from 'angular2/src/mock/template_resolver_mock';
 import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
-import {EventManager} from 'angular2/src/core/events/event_manager';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
+import {EventManager} from 'angular2/src/render/events/event_manager';
 
 import {Decorator, Component, Viewport, DynamicComponent} from 'angular2/src/core/annotations/annotations';
 import {Template} from 'angular2/src/core/annotations/template';
@@ -43,7 +43,7 @@ import {If} from 'angular2/src/directives/if';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
 
 export function main() {
-  describe('integration tests', function() {
+  ddescribe('integration tests', function() {
     var directiveMetadataReader, shadowDomStrategy, compiler, tplResolver;
 
     function createCompiler(tplResolver, changedDetection) {
@@ -76,15 +76,15 @@ export function main() {
       var view, ctx, cd;
       function createView(pv) {
         ctx = new MyComp();
-        view = pv.instantiate(null, null);
-
+        view = pv.instantiate(pv.render.instantiate(null), null, null);
+        view.render.hydrate(null);
         view.hydrate(new Injector([
           bind(Compiler).toValue(compiler),
           bind(DirectiveMetadataReader).toValue(directiveMetadataReader),
           bind(ShadowDomStrategy).toValue(shadowDomStrategy),
           bind(EventManager).toValue(null),
           PrivateComponentLoader
-        ]), null, null, ctx, null);
+        ]), null, ctx, null);
 
         cd = view.changeDetector;
       }
@@ -96,7 +96,7 @@ export function main() {
           ctx.ctxProp = 'Hello World!';
 
           cd.detectChanges();
-          expect(DOM.getInnerHTML(view.nodes[0])).toEqual('Hello World!');
+          expect(DOM.getInnerHTML(view.render.rootNodes[0])).toEqual('Hello World!');
           async.done();
         });
       }));
@@ -110,7 +110,7 @@ export function main() {
           ctx.ctxProp = 'Hello World!';
           cd.detectChanges();
 
-          expect(view.nodes[0].id).toEqual('Hello World!');
+          expect(view.render.rootNodes[0].id).toEqual('Hello World!');
           async.done();
         });
       }));
@@ -123,11 +123,11 @@ export function main() {
 
           ctx.ctxProp = 'Initial aria label';
           cd.detectChanges();
-          expect(DOM.getAttribute(view.nodes[0], 'aria-label')).toEqual('Initial aria label');
+          expect(DOM.getAttribute(view.render.rootNodes[0], 'aria-label')).toEqual('Initial aria label');
 
           ctx.ctxProp = 'Changed aria label';
           cd.detectChanges();
-          expect(DOM.getAttribute(view.nodes[0], 'aria-label')).toEqual('Changed aria label');
+          expect(DOM.getAttribute(view.render.rootNodes[0], 'aria-label')).toEqual('Changed aria label');
 
           async.done();
         });
@@ -140,11 +140,11 @@ export function main() {
           createView(pv);
 
           cd.detectChanges();
-          expect(view.nodes[0].tabIndex).toEqual(0);
+          expect(view.render.rootNodes[0].tabIndex).toEqual(0);
 
           ctx.ctxNumProp = 5;
           cd.detectChanges();
-          expect(view.nodes[0].tabIndex).toEqual(5);
+          expect(view.render.rootNodes[0].tabIndex).toEqual(5);
 
           async.done();
         });
@@ -157,11 +157,11 @@ export function main() {
           createView(pv);
 
           cd.detectChanges();
-          expect(view.nodes[0].readOnly).toBeFalsy();
+          expect(view.render.rootNodes[0].readOnly).toBeFalsy();
 
           ctx.ctxBoolProp = true;
           cd.detectChanges();
-          expect(view.nodes[0].readOnly).toBeTruthy();
+          expect(view.render.rootNodes[0].readOnly).toBeTruthy();
 
           async.done();
         });
@@ -175,11 +175,11 @@ export function main() {
 
           ctx.ctxProp = 'Some <span>HTML</span>';
           cd.detectChanges();
-          expect(DOM.getInnerHTML(view.nodes[0])).toEqual('Some <span>HTML</span>');
+          expect(DOM.getInnerHTML(view.render.rootNodes[0])).toEqual('Some <span>HTML</span>');
 
           ctx.ctxProp = 'Some other <div>HTML</div>';
           cd.detectChanges();
-          expect(DOM.getInnerHTML(view.nodes[0])).toEqual('Some other <div>HTML</div>');
+          expect(DOM.getInnerHTML(view.render.rootNodes[0])).toEqual('Some other <div>HTML</div>');
 
           async.done();
         });
@@ -247,7 +247,7 @@ export function main() {
 
           cd.detectChanges();
 
-          expect(view.nodes).toHaveText('hello');
+          expect(view.render.rootNodes).toHaveText('hello');
           async.done();
         });
       }));
@@ -300,13 +300,13 @@ export function main() {
 
           ctx.ctxProp = 'some_id';
           cd.detectChanges();
-          expect(view.nodes[0].id).toEqual('some_id');
-          expect(view.nodes).toHaveText('Matched on id with some_id');
+          expect(view.render.rootNodes[0].id).toEqual('some_id');
+          expect(view.render.rootNodes).toHaveText('Matched on id with some_id');
 
           ctx.ctxProp = 'other_id';
           cd.detectChanges();
-          expect(view.nodes[0].id).toEqual('other_id');
-          expect(view.nodes).toHaveText('Matched on id with other_id');
+          expect(view.render.rootNodes[0].id).toEqual('other_id');
+          expect(view.render.rootNodes).toHaveText('Matched on id with other_id');
 
           async.done();
         });
@@ -324,7 +324,7 @@ export function main() {
 
           cd.detectChanges();
 
-          var childNodesOfWrapper = view.nodes[0].childNodes;
+          var childNodesOfWrapper = view.render.rootNodes[0].childNodes;
           // 1 template + 2 copies.
           expect(childNodesOfWrapper.length).toBe(3);
           expect(childNodesOfWrapper[1].childNodes[0].nodeValue).toEqual('hello');
@@ -344,7 +344,7 @@ export function main() {
 
           cd.detectChanges();
 
-          var childNodesOfWrapper = view.nodes[0].childNodes;
+          var childNodesOfWrapper = view.render.rootNodes[0].childNodes;
           // 1 template + 2 copies.
           expect(childNodesOfWrapper.length).toBe(3);
           expect(childNodesOfWrapper[1].childNodes[0].nodeValue).toEqual('hello');
@@ -509,7 +509,6 @@ export function main() {
           inline: '<div emitter listener></div>',
           directives: [DecoratorEmitingEvent, DecoratorListeningEvent]
         }));
-
         compiler.compile(MyComp).then((pv) => {
           createView(pv);
 
@@ -542,7 +541,7 @@ export function main() {
 
           dynamicComponent.done.then((_) => {
             cd.detectChanges();
-            expect(view.nodes).toHaveText('hello');
+            expect(view.render.rootNodes).toHaveText('hello');
             async.done();
           });
         });

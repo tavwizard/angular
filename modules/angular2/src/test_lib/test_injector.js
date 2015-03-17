@@ -6,14 +6,14 @@ import {ExceptionHandler} from 'angular2/src/core/exception_handler';
 import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
-import {ShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {XHR} from 'angular2/src/core/compiler/xhr/xhr';
 import {XHRMock} from 'angular2/src/mock/xhr_mock';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {StyleInliner} from 'angular2/src/core/compiler/style_inliner';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 import {Injector} from 'angular2/di';
 

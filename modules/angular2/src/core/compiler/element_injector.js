@@ -6,9 +6,9 @@ import {Parent, Ancestor} from 'angular2/src/core/annotations/visibility';
 import {EventEmitter, PropertySetter} from 'angular2/src/core/annotations/di';
 import * as viewModule from 'angular2/src/core/compiler/view';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
-import {NgElement} from 'angular2/src/core/dom/element';
-import {Directive, onChange, onDestroy} from 'angular2/src/core/annotations/annotations';
-import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config';
+import {NgElement} from 'angular2/src/render/ng_element';
+import {Directive, onChange, onDestroy} from 'angular2/src/core/annotations/annotations'
+import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config'
 import * as pclModule from 'angular2/src/core/compiler/private_component_location';
 import {reflector} from 'angular2/src/reflection/reflection';
 
@@ -676,6 +676,11 @@ export class ElementInjector extends TreeNode {
   /** Get the name to which this element's $implicit is to be assigned. */
   getExportImplicitName() {
     return this._proto.exportImplicitName;
+  }
+
+  /** Get the index in the bound elements for which this injector was created. */
+  getElementBinderIndex() {
+    return this._proto.index;
   }
 }
 

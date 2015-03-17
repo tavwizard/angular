@@ -6,7 +6,7 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {ListWrapper, MapWrapper} from 'angular2/src/facade/collection';
 import {Injector} from 'angular2/di';
 import {ProtoElementInjector, ElementInjector} from 'angular2/src/core/compiler/element_injector';
-import {NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {DynamicProtoChangeDetector, ChangeDetector, Lexer, Parser} from 'angular2/change_detection';
 
 function createView(nodes) {

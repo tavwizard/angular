@@ -8,8 +8,8 @@ import {onDestroy} from 'angular2/src/core/annotations/annotations';
 import {Optional, Injector, Inject, bind} from 'angular2/di';
 import {ProtoView, View} from 'angular2/src/core/compiler/view';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
-import {NgElement} from 'angular2/src/core/dom/element';
-import {LightDom, DestinationLightDom} from 'angular2/src/core/compiler/shadow_dom_emulation/light_dom';
+import {NgElement} from 'angular2/src/render/ng_element';
+import {LightDom, DestinationLightDom} from 'angular2/src/render/shadow_dom/emulation/light_dom';
 import {Directive} from 'angular2/src/core/annotations/annotations';
 import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config';
 

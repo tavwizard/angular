@@ -4,19 +4,19 @@ import {PromiseWrapper} from 'angular2/src/facade/async';
 
 import {DOM} from 'angular2/src/dom/dom_adapter';
 
-import * as viewModule from './view';
+import * as viewModule from '../render_view';
 
-import {LightDom} from './shadow_dom_emulation/light_dom';
-import {ShadowCss} from './shadow_dom_emulation/shadow_css';
+import {LightDom} from './emulation/light_dom';
+import {ShadowCss} from './emulation/shadow_css';
 
 import {StyleInliner} from './style_inliner';
 import {StyleUrlResolver} from './style_url_resolver';
 
-import {DirectiveMetadata} from './directive_metadata';
+import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
 
-import * as NS from './pipeline/compile_step';
-import {CompileElement} from './pipeline/compile_element';
-import {CompileControl} from './pipeline/compile_control';
+import * as NS from 'angular2/src/core/compiler/pipeline/compile_step';
+import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';
+import {CompileControl} from 'angular2/src/core/compiler/pipeline/compile_control';
 
 var _EMPTY_STEP;
 
@@ -30,8 +30,8 @@ function _emptyStep() {
 }
 
 export class ShadowDomStrategy {
-  attachTemplate(el, view:viewModule.View) {}
-  constructLightDom(lightDomView:viewModule.View, shadowDomView:viewModule.View, el): LightDom { return null; }
+  attachTemplate(el, view:viewModule.RenderView) {}
+  constructLightDom(lightDomView:viewModule.RenderView, shadowDomView:viewModule.RenderView, el): LightDom { return null; }
 
   /**
    * An optional step that can modify the template style elements.
@@ -87,12 +87,12 @@ export class EmulatedUnscopedShadowDomStrategy extends ShadowDomStrategy {
     this._styleHost = styleHost;
   }
 
-  attachTemplate(el, view:viewModule.View) {
+  attachTemplate(el, view:viewModule.RenderView) {
     DOM.clearNodes(el);
     _moveViewNodesIntoParent(el, view);
   }
 
-  constructLightDom(lightDomView:viewModule.View, shadowDomView:viewModule.View, el): LightDom {
+  constructLightDom(lightDomView:viewModule.RenderView, shadowDomView:viewModule.RenderView, el): LightDom {
     return new LightDom(lightDomView, shadowDomView, el);
   }
 
@@ -103,7 +103,7 @@ export class EmulatedUnscopedShadowDomStrategy extends ShadowDomStrategy {
 
   getTemplateCompileStep(cmpMetadata: DirectiveMetadata): NS.CompileStep {
     return new _BaseEmulatedShadowDomStep();
-  }  
+  }
 }
 
 /**
@@ -156,7 +156,7 @@ export class NativeShadowDomStrategy extends ShadowDomStrategy {
     this._styleUrlResolver = styleUrlResolver;
   }
 
-  attachTemplate(el, view:viewModule.View){
+  attachTemplate(el, view:viewModule.RenderView){
     _moveViewNodesIntoParent(DOM.createShadowRoot(el), view);
   }
 
@@ -186,7 +186,7 @@ class _BaseEmulatedShadowDomStep extends NS.CompileStep {
       DOM.remove(current.element);
 
       current.element = contentStart;
-    }    
+    }
   }
 
 }
@@ -282,7 +282,7 @@ class _EmulatedScopedCssStep extends NS.CompileStep {
 
     if (PromiseWrapper.isPromise(css)) {
       DOM.setText(styleEl, '');
-      ListWrapper.push(parent.inheritedProtoView.stylePromises, css);
+      ListWrapper.push(parent.inheritedProtoView.render.stylePromises, css);
       return css.then((css) => {
         css = _shimCssForComponent(css, this._component);
         DOM.setText(styleEl, css);
@@ -316,8 +316,8 @@ class _NativeCssStep extends NS.CompileStep {
 }
 
 function _moveViewNodesIntoParent(parent, view) {
-  for (var i = 0; i < view.nodes.length; ++i) {
-    DOM.appendChild(parent, view.nodes[i]);
+  for (var i = 0; i < view.rootNodes.length; ++i) {
+    DOM.appendChild(parent, view.rootNodes[i]);
   }
 }
 

@@ -148,7 +148,12 @@ export class ElementBinderBuilder extends CompileStep {
       var currentProtoElementInjector = protoInjectorWasBuilt ?
           current.inheritedProtoElementInjector : null;
 
-      elementBinder = protoView.bindElement(parentElementBinder, distanceToParentBinder,
+      var renderBinder = protoView.render.bindElement(
+          isPresent(parentElementBinder) ? parentElementBinder.render : null,
+          distanceToParentBinder,
+          isPresent(current.viewportDirective)
+      );
+      elementBinder = protoView.bindElement(renderBinder,
           currentProtoElementInjector, current.componentDirective, current.viewportDirective);
       current.distanceToParentBinder = 0;
 
@@ -162,7 +167,7 @@ export class ElementBinderBuilder extends CompileStep {
         this._bindEvents(protoView, current);
       }
       if (isPresent(current.contentTagSelector)) {
-        elementBinder.contentTagSelector = current.contentTagSelector;
+        elementBinder.render.contentTagSelector = current.contentTagSelector;
       }
       var directives = current.getAllDirectives();
       this._bindDirectiveProperties(directives, current);

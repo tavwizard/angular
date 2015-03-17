@@ -11,19 +11,19 @@ import {
 import {reflector} from 'angular2/src/reflection/reflection';
 import {CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
-import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
-import {Content} from 'angular2/src/core/compiler/shadow_dom_emulation/content_tag';
-import {DestinationLightDom} from 'angular2/src/core/compiler/shadow_dom_emulation/light_dom';
+import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
+import {Content} from 'angular2/src/render/shadow_dom/emulation/content_tag';
+import {DestinationLightDom} from 'angular2/src/render/shadow_dom/emulation/light_dom';
 import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
 import {LifeCycle} from 'angular2/src/core/life_cycle/life_cycle';
 import {XHR} from 'angular2/src/core/compiler/xhr/xhr';
 import {XHRImpl} from 'angular2/src/core/compiler/xhr/xhr_impl';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
-import {StyleInliner} from 'angular2/src/core/compiler/style_inliner';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 import {If, Foreach} from 'angular2/directives';
 import {App, setupReflectorForApp} from './app';

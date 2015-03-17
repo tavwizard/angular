@@ -2,7 +2,7 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {List, ListWrapper} from 'angular2/src/facade/collection';
 import {isBlank, isPresent} from 'angular2/src/facade/lang';
 
-import * as viewModule from '../view';
+import * as viewModule from '../../render_view';
 import {Content} from './content_tag';
 
 export class DestinationLightDom {}
@@ -24,14 +24,14 @@ class _Root {
 // once interfaces are supported
 export class LightDom {
   // The light DOM of the element is enclosed inside the lightDomView
-  lightDomView:viewModule.View;
+  lightDomView:viewModule.RenderView;
   // The shadow DOM
-  shadowDomView:viewModule.View;
+  shadowDomView:viewModule.RenderView;
   // The nodes of the light DOM
   nodes:List;
   roots:List<_Root>;
 
-  constructor(lightDomView:viewModule.View, shadowDomView:viewModule.View, element) {
+  constructor(lightDomView:viewModule.RenderView, shadowDomView:viewModule.RenderView, element) {
     this.lightDomView = lightDomView;
     this.shadowDomView = shadowDomView;
     this.nodes = DOM.childNodesAsList(element);
@@ -51,19 +51,19 @@ export class LightDom {
   }
 
   // Collects the Content directives from the view and all its child views
-  _collectAllContentTags(view: viewModule.View, acc:List<Content>):List<Content> {
+  _collectAllContentTags(view: viewModule.RenderView, acc:List<Content>):List<Content> {
     var contentTags = view.contentTags;
     var vcs = view.viewContainers;
     for (var i=0; i<vcs.length; i++) {
       var vc = vcs[i];
       var contentTag = contentTags[i];
       if (isPresent(contentTag)) {
-        ListWrapper.push(acc, contentTag);  
+        ListWrapper.push(acc, contentTag);
       }
       if (isPresent(vc)) {
         ListWrapper.forEach(vc.contentTagContainers(), (view) => {
           this._collectAllContentTags(view, acc);
-        });              
+        });
       }
     }
     return acc;
@@ -75,7 +75,7 @@ export class LightDom {
   // - plain DOM nodes
   expandedDomNodes():List {
     var res = [];
-    
+
     var roots = this._roots();
     for (var i = 0; i < roots.length; ++i) {
 

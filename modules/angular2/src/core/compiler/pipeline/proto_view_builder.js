@@ -7,7 +7,8 @@ import {ChangeDetection} from 'angular2/change_detection';
 import {CompileStep} from './compile_step';
 import {CompileElement} from './compile_element';
 import {CompileControl} from './compile_control';
-import {ShadowDomStrategy} from '../shadow_dom_strategy';
+import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
+import {ProtoRenderView} from 'angular2/src/render/render_view';
 
 /**
  * Creates ProtoViews and forwards variable bindings from parent to children.
@@ -34,14 +35,15 @@ export class ProtoViewBuilder extends CompileStep {
     var inheritedProtoView = null;
     if (current.isViewRoot) {
       var protoChangeDetector = this.changeDetection.createProtoChangeDetector('dummy');
-      inheritedProtoView = new ProtoView(current.element, protoChangeDetector,
-        this._shadowDomStrategy, this._getParentProtoView(parent));
+      var renderProtoView = new ProtoRenderView(current.element, this._shadowDomStrategy);
+      inheritedProtoView = new ProtoView(renderProtoView, protoChangeDetector, this._getParentProtoView(parent));
 
       if (isPresent(parent)) {
         if (isPresent(parent.inheritedElementBinder.nestedProtoView)) {
           throw new BaseException('Only one nested view per element is allowed');
         }
         parent.inheritedElementBinder.nestedProtoView = inheritedProtoView;
+        parent.inheritedElementBinder.render.nestedProtoView = inheritedProtoView.render;
 
         // When current is a view root, the variable bindings are set to the *nested* proto view.
         // The root view conceptually signifies a new "block scope" (the nested view), to which

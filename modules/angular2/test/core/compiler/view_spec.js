@@ -1,7 +1,7 @@
 import {describe, xit, it, expect, beforeEach, ddescribe, iit, el, proxy, IS_NODEJS} from 'angular2/test_lib';
 import {ProtoView, ElementPropertyMemento, DirectivePropertyMemento} from 'angular2/src/core/compiler/view';
 import {ProtoElementInjector, ElementInjector, DirectiveBinding} from 'angular2/src/core/compiler/element_injector';
-import {EmulatedScopedShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {EmulatedScopedShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
 import {Component, Decorator, Viewport, Directive, onChange} from 'angular2/src/core/annotations/annotations';
 import {Lexer, Parser, DynamicProtoChangeDetector,
@@ -14,7 +14,7 @@ import {Injector} from 'angular2/di';
 import {View, PropertyUpdate} from 'angular2/src/core/compiler/view';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
 import {VmTurnZone} from 'angular2/src/core/zone/vm_turn_zone';
-import {EventManager, DomEventsPlugin} from 'angular2/src/core/events/event_manager';
+import {EventManager, DomEventsPlugin} from 'angular2/src/render/events/event_manager';
 import {reflector} from 'angular2/src/reflection/reflection';
 
 @proxy
@@ -351,7 +351,7 @@ export function main() {
               el('<div dec class="ng-binding">hello shadow dom</div>'),
               new DynamicProtoChangeDetector(null),
               null);
-            subpv.bindElement(null, 0, 
+            subpv.bindElement(null, 0,
               new ProtoElementInjector(null, 0, [ServiceDependentDecorator]));
             var pv = createComponentWithSubPV(subpv);
 
@@ -376,7 +376,7 @@ export function main() {
             el('<div dec class="ng-binding">hello shadow dom</div>'),
             new DynamicProtoChangeDetector(null),
             null);
-          subpv.bindElement(null, 0, 
+          subpv.bindElement(null, 0,
             new ProtoElementInjector(null, 0, [ServiceDependentDecorator]));
           var pv = createComponentWithSubPV(subpv);
 

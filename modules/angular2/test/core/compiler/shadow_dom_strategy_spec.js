@@ -16,10 +16,10 @@ import {
   EmulatedScopedShadowDomStrategy,
   EmulatedUnscopedShadowDomStrategy,
   resetShadowDomCache,
-} from 'angular2/src/core/compiler/shadow_dom_strategy';
+} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {StyleInliner} from 'angular2/src/core/compiler/style_inliner';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
 import {ProtoView} from 'angular2/src/core/compiler/view';
 import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
 

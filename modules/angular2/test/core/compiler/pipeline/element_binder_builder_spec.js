@@ -8,7 +8,7 @@ import {CompilePipeline} from 'angular2/src/core/compiler/pipeline/compile_pipel
 import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';
 import {CompileStep} from 'angular2/src/core/compiler/pipeline/compile_step'
 import {CompileControl} from 'angular2/src/core/compiler/pipeline/compile_control';
-import {NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 
 import {Decorator, Component, Viewport} from 'angular2/src/core/annotations/annotations';
 import {ProtoView, ElementPropertyMemento, DirectivePropertyMemento} from 'angular2/src/core/compiler/view';

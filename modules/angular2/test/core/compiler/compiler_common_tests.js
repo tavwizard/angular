@@ -28,11 +28,11 @@ import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
 import {ComponentUrlMapper, RuntimeComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 import {Lexer, Parser, dynamicChangeDetection} from 'angular2/change_detection';
-import {ShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy, NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 
 export function runCompilerCommonTests() {
   describe('compiler', function() {

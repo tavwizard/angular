@@ -52,8 +52,8 @@ class IntermediateContent extends ContentStrategy {
 
   constructor(destinationLightDom:ldModule.LightDom) {
     super();
-    this.destinationLightDom = destinationLightDom;
     this.nodes = [];
+    this.destinationLightDom = destinationLightDom;
   }
 
   insert(nodes:List) {
@@ -68,12 +68,20 @@ export class Content {
   _strategy:ContentStrategy;
   contentStartElement;
 
-  constructor(destinationLightDom:ldModule.LightDom, contentStartEl, selector:string) {
+  constructor(contentStartEl, selector:string) {
     this.select = selector;
     this.contentStartElement = contentStartEl;
+    this._strategy = null;
+  }
+
+  hydrate(destinationLightDom:ldModule.LightDom) {
     this._strategy = isPresent(destinationLightDom) ?
       new IntermediateContent(destinationLightDom) :
-      new RenderedContent(contentStartEl);
+      new RenderedContent(this.contentStartElement);
+  }
+
+  dehydrate() {
+    this._strategy = null;
   }
 
   nodes():List {

@@ -1,8 +1,8 @@
 import {describe, beforeEach, it, expect, ddescribe, iit, SpyObject, el, proxy} from 'angular2/test_lib';
 import {IMPLEMENTS} from 'angular2/src/facade/lang';
 import {DOM} from 'angular2/src/dom/dom_adapter';
-import {Content} from 'angular2/src/core/compiler/shadow_dom_emulation/content_tag';
-import {LightDom} from 'angular2/src/core/compiler/shadow_dom_emulation/light_dom';
+import {Content} from 'angular2/src/render/shadow_dom/emulation/content_tag';
+import {LightDom} from 'angular2/src/render/shadow_dom/emulation/light_dom';
 
 @proxy
 @IMPLEMENTS(LightDom)

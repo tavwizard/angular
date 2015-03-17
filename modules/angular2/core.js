@@ -11,4 +11,4 @@ export * from './src/core/compiler/view';
 export * from './src/core/compiler/view_container';
 export * from './src/core/compiler/binding_propagation_config';
 
-export * from './src/core/dom/element';
+export * from './src/render/ng_element';

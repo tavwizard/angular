@@ -1,7 +1,7 @@
 import {describe, it, expect, beforeEach, ddescribe, iit, xit, el} from 'angular2/test_lib';
-import {CssProcessor, CssTransformer} from 'angular2/src/core/compiler/css_processor';
+import {CssProcessor, CssTransformer} from 'angular2/src/render/shadow_dom/css_processor';
 
-import {ShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 
 import {CompilePipeline} from 'angular2/src/core/compiler/pipeline/compile_pipeline';
 import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';

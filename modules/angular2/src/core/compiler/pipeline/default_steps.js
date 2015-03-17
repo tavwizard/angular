@@ -10,9 +10,9 @@ import {ProtoViewBuilder} from './proto_view_builder';
 import {ProtoElementInjectorBuilder} from './proto_element_injector_builder';
 import {ElementBinderBuilder} from './element_binder_builder';
 
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
-import {ShadowDomStrategy, EmulatedScopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy, EmulatedScopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 
 /**
  * Default steps used for compiling a template.

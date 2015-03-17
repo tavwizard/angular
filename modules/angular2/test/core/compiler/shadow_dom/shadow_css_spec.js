@@ -1,5 +1,5 @@
 import {describe, beforeEach, it, expect, ddescribe, iit, SpyObject, el, IS_NODEJS} from 'angular2/test_lib';
-import {ShadowCss} from 'angular2/src/core/compiler/shadow_dom_emulation/shadow_css';
+import {ShadowCss} from 'angular2/src/render/shadow_dom/emulation/shadow_css';
 
 import {RegExpWrapper, StringWrapper} from 'angular2/src/facade/lang';
 

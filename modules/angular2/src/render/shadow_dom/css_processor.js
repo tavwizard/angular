@@ -3,12 +3,12 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {isPresent} from 'angular2/src/facade/lang';
 import {List} from 'angular2/src/facade/collection';
 
-import {CompileStep} from './pipeline/compile_step';
-import {CompileElement} from './pipeline/compile_element';
-import {CompileControl} from './pipeline/compile_control';
+import {CompileStep} from 'angular2/src/core/compiler/pipeline/compile_step';
+import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';
+import {CompileControl} from 'angular2/src/core/compiler/pipeline/compile_control';
 
 import {ShadowDomStrategy} from './shadow_dom_strategy';
-import {DirectiveMetadata} from './directive_metadata';
+import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
 
 /**
  * Processes the <style> tags during the compilation:

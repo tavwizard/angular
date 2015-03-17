@@ -14,17 +14,17 @@ import {List, ListWrapper} from 'angular2/src/facade/collection';
 import {Promise, PromiseWrapper} from 'angular2/src/facade/async';
 import {VmTurnZone} from 'angular2/src/core/zone/vm_turn_zone';
 import {LifeCycle} from 'angular2/src/core/life_cycle/life_cycle';
-import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {XHR} from 'angular2/src/core/compiler/xhr/xhr';
 import {XHRImpl} from 'angular2/src/core/compiler/xhr/xhr_impl';
-import {EventManager, DomEventsPlugin} from 'angular2/src/core/events/event_manager';
-import {HammerGesturesPlugin} from 'angular2/src/core/events/hammer_gestures';
+import {EventManager, DomEventsPlugin} from 'angular2/src/render/events/event_manager';
+import {HammerGesturesPlugin} from 'angular2/src/render/events/hammer_gestures';
 import {Binding} from 'angular2/src/di/binding';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {StyleInliner} from 'angular2/src/core/compiler/style_inliner';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 var _rootInjector: Injector;
 

@@ -16,18 +16,18 @@ import {Lexer, Parser, ChangeDetector, dynamicChangeDetection} from 'angular2/ch
 
 import {Compiler, CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
-import {NativeShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {NativeShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
-import {StyleUrlResolver} from 'angular2/src/core/compiler/style_url_resolver';
-import {CssProcessor} from 'angular2/src/core/compiler/css_processor';
+import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
+import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 
 
 import {Decorator, Component} from 'angular2/src/core/annotations/annotations';
 import {Template} from 'angular2/src/core/annotations/template';
 
 import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
-import {NgElement} from 'angular2/src/core/dom/element';
+import {NgElement} from 'angular2/src/render/ng_element';
 import {NonBindable} from 'angular2/src/directives/non_bindable';
 import {MockTemplateResolver} from 'angular2/src/mock/template_resolver_mock';
 
