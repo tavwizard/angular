@@ -78,7 +78,7 @@ export function main() {
       var view, ctx, cd;
       function createView(pv) {
         ctx = new MyComp();
-        view = viewFactory.getView(pv.render.instantiate(null), pv, null, null);
+        view = viewFactory.getView(viewFactory.render.getView(pv.render, null), pv, null, null);
         view.render.hydrate(null);
         view.hydrate(new Injector([
           bind(Compiler).toValue(compiler),

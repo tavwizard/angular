@@ -25,7 +25,7 @@ export class PrivateComponentLocation {
                   eventManager:EventManager, shadowDomStrategy:ShadowDomStrategy) {
     var context = this._elementInjector.createPrivateComponent(type, annotation);
 
-    var renderView = componentProtoView.render.instantiate(eventManager);
+    var renderView = this._viewFactory.render.getView(componentProtoView.render, eventManager);
     var view = this._viewFactory.getView(renderView, componentProtoView, this._elementInjector, eventManager);
 
     this._view.render.setComponentView(

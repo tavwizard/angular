@@ -1,3 +1,4 @@
+import {OpaqueToken} from 'angular2/di';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 
 import {ElementInjector, PreBuiltObjects} from './element_injector';
@@ -8,6 +9,7 @@ import {ViewContainer} from './view_container';
 import {EventManager} from 'angular2/src/render/events/event_manager';
 
 import {RenderView} from 'angular2/src/render/render_view';
+import {RenderViewFactory} from 'angular2/src/render/render_view_factory';
 import {ProtoView, View} from './view';
 
 export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
@@ -15,10 +17,12 @@ export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
 export class ViewFactory {
   _poolCapacity:number;
   _pooledViews:List<View>;
+  render:RenderViewFactory;
 
   constructor(capacity) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
+    this.render = new RenderViewFactory(capacity);
   }
 
   getView(renderView:RenderView, protoView:ProtoView, hostElementInjector: ElementInjector, eventManager: EventManager): View {
@@ -73,7 +77,7 @@ export class ViewFactory {
       // componentChildViews
       var bindingPropagationConfig = null;
       if (isPresent(binder.nestedProtoView) && isPresent(binder.componentDirective)) {
-        var childRenderView = binder.nestedProtoView.render.instantiate(eventManager);
+        var childRenderView = this.render.getView(binder.nestedProtoView.render, eventManager);
         var childView = this.getView(
           childRenderView, binder.nestedProtoView,
           elementInjector, eventManager

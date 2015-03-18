@@ -5,9 +5,10 @@ import {BaseException} from 'angular2/src/facade/lang';
 import {isPresent, isBlank} from 'angular2/src/facade/lang';
 import {EventManager} from 'angular2/src/render/events/event_manager';
 import * as ldModule from './shadow_dom/emulation/light_dom';
+import * as vfModule from './render_view_factory';
 
 export class RenderViewContainer {
-  parentView: viewModule.RenderView;
+  _viewFactory: vfModule.RenderViewFactory;
   templateElement;
   defaultProtoView: viewModule.ProtoRenderView;
   _views: List<viewModule.RenderView>;
@@ -16,11 +17,11 @@ export class RenderViewContainer {
   hostLightDom: ldModule.LightDom;
   _hydrated: boolean;
 
-  constructor(parentView: viewModule.RenderView,
+  constructor(viewFactory: vfModule.RenderViewFactory,
               templateElement,
               defaultProtoView: viewModule.ProtoRenderView,
               eventManager: EventManager) {
-    this.parentView = parentView;
+    this._viewFactory = viewFactory;
     this.templateElement = templateElement;
     this.defaultProtoView = defaultProtoView;
 
@@ -69,7 +70,7 @@ export class RenderViewContainer {
     if (!this._hydrated) throw new BaseException(
         'Cannot create views on a dehydrated ViewContainer');
     // TODO(rado): replace with viewFactory.
-    var newView = this.defaultProtoView.instantiate(this._eventManager);
+    var newView = this._viewFactory.getView(defaultProtoView, this._eventManager);
     // insertion must come before hydration so that element injector trees are attached.
     this.insert(newView, atIndex);
     newView.hydrate(this.hostLightDom);
@@ -97,6 +98,7 @@ export class RenderViewContainer {
     if (atIndex == -1) atIndex = this._views.length - 1;
     var view = this.detach(atIndex);
     view.dehydrate();
+    this._viewFactory.returnView(view);
   }
 
   /**

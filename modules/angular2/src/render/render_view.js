@@ -11,7 +11,6 @@ import {ShadowDomStrategy} from './shadow_dom/shadow_dom_strategy';
 import {EventManager} from 'angular2/src/render/events/event_manager';
 
 const NG_BINDING_CLASS = 'ng-binding';
-const NG_BINDING_CLASS_SELECTOR = '.ng-binding';
 
 /**
  * Const of making objects: http://jsperf.com/instantiate-size-of-object
@@ -32,15 +31,17 @@ export class RenderView {
   eventManager: EventManager;
   _hydrated: boolean;
 
-  constructor(proto:ProtoRenderView, rootNodes:List, eventManager:EventManager) {
+  constructor(
+      proto:ProtoRenderView, rootNodes:List, eventManager:EventManager,
+      boundTextNodes: List, boundElements:List, viewContainers:List, contentTags:List) {
     this.proto = proto;
     this.rootNodes = rootNodes;
-    this.boundTextNodes = null;
-    this.boundElements = null;
-    this.componentChildViews = null;
-    this.viewContainers = null;
-    this.contentTags = null;
-    this.lightDoms = null;
+    this.boundTextNodes = boundTextNodes;
+    this.boundElements = boundElements;
+    this.viewContainers = viewContainers;
+    this.contentTags = contentTags;
+    this.lightDoms = ListWrapper.createFixedSize(boundElements.length);
+    this.componentChildViews = ListWrapper.createFixedSize(boundElements.length);
     this.eventManager = eventManager;
     this._hydrated = false;
   }
@@ -66,15 +67,6 @@ export class RenderView {
     strategy.attachTemplate(element, childView);
     this.lightDoms[elementIndex] = lightDom;
     this.componentChildViews[elementIndex] = childView;
-  }
-
-  init(boundTextNodes: List, boundElements:List, viewContainers:List, contentTags:List) {
-    this.boundTextNodes = boundTextNodes;
-    this.boundElements = boundElements;
-    this.viewContainers = viewContainers;
-    this.contentTags = contentTags;
-    this.lightDoms = ListWrapper.createFixedSize(boundElements.length);
-    this.componentChildViews = ListWrapper.createFixedSize(boundElements.length);
   }
 
   _getDestLightDom(binderIndex) {
@@ -175,83 +167,6 @@ export class ProtoRenderView {
     this.isTemplateElement = DOM.isTemplateElement(this.element);
     this.shadowDomStrategy = shadowDomStrategy;
     this.stylePromises = [];
-  }
-
-  instantiate(eventManager: EventManager): RenderView {
-    var rootElementClone = this.instantiateInPlace ? this.element : DOM.importIntoDoc(this.element);
-    var elementsWithBindingsDynamic;
-    if (this.isTemplateElement) {
-      elementsWithBindingsDynamic = DOM.querySelectorAll(DOM.content(rootElementClone), NG_BINDING_CLASS_SELECTOR);
-    } else {
-      elementsWithBindingsDynamic= DOM.getElementsByClassName(rootElementClone, NG_BINDING_CLASS);
-    }
-
-    var elementsWithBindings = ListWrapper.createFixedSize(elementsWithBindingsDynamic.length);
-    for (var binderIdx = 0; binderIdx < elementsWithBindingsDynamic.length; ++binderIdx) {
-      elementsWithBindings[binderIdx] = elementsWithBindingsDynamic[binderIdx];
-    }
-
-    var viewRootNodes;
-    if (this.isTemplateElement) {
-      var childNode = DOM.firstChild(DOM.content(rootElementClone));
-      viewRootNodes = []; // TODO(perf): Should be fixed size, since we could pre-compute in in ProtoView
-      // Note: An explicit loop is the fastest way to convert a DOM array into a JS array!
-      while(childNode != null) {
-        ListWrapper.push(viewRootNodes, childNode);
-        childNode = DOM.nextSibling(childNode);
-      }
-    } else {
-      viewRootNodes = [rootElementClone];
-    }
-
-    var view = new RenderView(this, viewRootNodes, eventManager);
-
-    var binders = this.elementBinders;
-    var boundTextNodes = [];
-    var boundElements = ListWrapper.createFixedSize(binders.length);
-    var viewContainers = ListWrapper.createFixedSize(binders.length);
-    var contentTags = ListWrapper.createFixedSize(binders.length);
-
-    for (var binderIdx = 0; binderIdx < binders.length; binderIdx++) {
-      var binder = binders[binderIdx];
-      var element;
-      if (binderIdx === 0 && this.rootBindingOffset === 1) {
-        element = rootElementClone;
-      } else {
-        element = elementsWithBindings[binderIdx - this.rootBindingOffset];
-      }
-      boundElements[binderIdx] = element;
-
-      // boundTextNodes
-      var textNodeIndices = binder.textNodeIndices;
-      if (isPresent(textNodeIndices)) {
-        var childNode = DOM.firstChild(DOM.templateAwareRoot(element));
-        for (var j = 0, k = 0; j < textNodeIndices.length; j++) {
-          for(var index = textNodeIndices[j]; k < index; k++) {
-            childNode = DOM.nextSibling(childNode);
-          }
-          ListWrapper.push(boundTextNodes, childNode);
-        }
-      }
-
-      // viewContainers
-      var viewContainer = null;
-      if (binder.isViewContainer) {
-        viewContainer = new RenderViewContainer(view, element, binder.nestedProtoView, eventManager);
-      }
-      viewContainers[binderIdx] = viewContainer;
-
-      // contentTags
-      var contentTag = null;
-      if (isPresent(binder.contentTagSelector)) {
-        contentTag = new Content(element, binder.contentTagSelector);
-      }
-      contentTags[binderIdx] = contentTag;
-    }
-
-    view.init(boundTextNodes, boundElements, viewContainers, contentTags);
-
-    return view;
   }
 
   bindElement(parent:RenderElementBinder, distanceToParent:int, isViewContainer:boolean = false):RenderElementBinder {
