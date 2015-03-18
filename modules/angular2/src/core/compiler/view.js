@@ -19,10 +19,6 @@ import {ProtoRenderView, RenderView} from 'angular2/src/render/render_view';
 import {RenderViewContainer} from 'angular2/src/render/render_view_container';
 import {RenderElementBinder} from 'angular2/src/render/render_element_binder';
 
-// TODO(rado): make this configurable/smarter.
-var VIEW_POOL_CAPACITY = 10000;
-var VIEW_POOL_PREFILL = 0;
-
 /**
  * Const of making objects: http://jsperf.com/instantiate-size-of-object
  * @publicModule angular2/angular2
@@ -265,7 +261,6 @@ export class ProtoView {
   variableBindings: Map;
   protoLocals:Map;
   textNodesWithBindingCount:int;
-  _viewPool: ViewPool;
   // List<Map<eventName, handler>>, indexed by binder index
   eventHandlers:List;
   bindingRecords:List;
@@ -284,127 +279,26 @@ export class ProtoView {
     this.protoChangeDetector = protoChangeDetector;
     this.parentProtoView = parentProtoView;
     this.textNodesWithBindingCount = 0;
-    this._viewPool = new ViewPool(VIEW_POOL_CAPACITY);
     this.eventHandlers = [];
     this.bindingRecords = [];
     this._variableBindings = null;
   }
 
-  // TODO(rado): hostElementInjector should be moved to hydrate phase.
-  instantiate(renderView:RenderView, hostElementInjector: ElementInjector, eventManager: EventManager):View {
-    if (this._viewPool.length() == 0) this._preFillPool(hostElementInjector, eventManager);
-    var view = this._viewPool.pop();
-    return isPresent(view) ? view : this._instantiate(renderView, hostElementInjector, eventManager);
-  }
-
-  _preFillPool(hostElementInjector: ElementInjector, eventManager: EventManager) {
-    for (var i = 0; i < VIEW_POOL_PREFILL; i++) {
-      var renderView = this.renderProtoView.instantiate(eventManager);
-      this._viewPool.push(this._instantiate(renderView, hostElementInjector, eventManager));
-    }
-  }
-
   // this work should be done the constructor of ProtoView once we separate
   // ProtoView and ProtoViewBuilder
-  _getVariableBindings() {
+  getVariableBindings() {
     if (isPresent(this._variableBindings)) {
       return this._variableBindings;
     }
 
     this._variableBindings = isPresent(this.parentProtoView) ?
-      ListWrapper.clone(this.parentProtoView._getVariableBindings()) : [];
+      ListWrapper.clone(this.parentProtoView.getVariableBindings()) : [];
 
     MapWrapper.forEach(this.protoLocals, (v, local) => {
       ListWrapper.push(this._variableBindings, local);
     });
 
     return this._variableBindings;
-  }
-
-  _instantiate(renderView:RenderView, hostElementInjector: ElementInjector, eventManager: EventManager): View {
-    var view = new View(renderView, this, this.protoLocals);
-    var changeDetector = this.protoChangeDetector.instantiate(view, this.bindingRecords, this._getVariableBindings());
-    var binders = this.elementBinders;
-    var elementInjectors = ListWrapper.createFixedSize(binders.length);
-    var eventHandlers = ListWrapper.createFixedSize(binders.length);
-    var rootElementInjectors = [];
-    var preBuiltObjects = ListWrapper.createFixedSize(binders.length);
-    var viewContainers = ListWrapper.createFixedSize(binders.length);
-    var componentChildViews = [];
-
-    for (var binderIdx = 0; binderIdx < binders.length; binderIdx++) {
-      var binder = binders[binderIdx];
-      var element = renderView.boundElements[binderIdx];
-      var elementInjector = null;
-
-      // elementInjectors and rootElementInjectors
-      var protoElementInjector = binder.protoElementInjector;
-      if (isPresent(protoElementInjector)) {
-        if (isPresent(protoElementInjector.parent)) {
-          var parentElementInjector = elementInjectors[protoElementInjector.parent.index];
-          elementInjector = protoElementInjector.instantiate(parentElementInjector, null);
-        } else {
-          elementInjector = protoElementInjector.instantiate(null, hostElementInjector);
-          ListWrapper.push(rootElementInjectors, elementInjector);
-        }
-      }
-      elementInjectors[binderIdx] = elementInjector;
-
-      // componentChildViews
-      var bindingPropagationConfig = null;
-      if (isPresent(binder.nestedProtoView) && isPresent(binder.componentDirective)) {
-        var childRenderView = binder.nestedProtoView.render.instantiate(eventManager);
-        var childView = binder.nestedProtoView.instantiate(
-          childRenderView, elementInjector, eventManager
-        );
-        renderView.setComponentView(binderIdx, childRenderView);
-        changeDetector.addChild(childView.changeDetector);
-
-        bindingPropagationConfig = new BindingPropagationConfig(changeDetector);
-
-        ListWrapper.push(componentChildViews, childView);
-      }
-
-      // viewContainers
-      var viewContainer = null;
-      if (isPresent(binder.viewportDirective)) {
-        viewContainer = new ViewContainer(
-          renderView.viewContainers[binderIdx], view, binder.nestedProtoView,
-          elementInjector, eventManager
-        );
-      }
-      viewContainers[binderIdx] = viewContainer;
-
-      // preBuiltObjects
-      if (isPresent(elementInjector)) {
-        preBuiltObjects[binderIdx] = new PreBuiltObjects(view, new NgElement(element), viewContainer,
-          bindingPropagationConfig);
-      }
-
-      // events
-      if (isPresent(binder.events)) {
-        eventHandlers[binderIdx] = StringMapWrapper.create();
-        StringMapWrapper.forEach(binder.events, (eventMap, eventName) => {
-          var handler = ProtoView.buildEventHandler(eventMap, binderIdx);
-          StringMapWrapper.set(eventHandlers[binderIdx], eventName, handler);
-          if (isBlank(elementInjector) || !elementInjector.hasEventEmitter(eventName)) {
-            renderView.listen(binderIdx, eventName,
-              (event) => { handler(event, view); });
-          }
-        });
-      }
-    }
-
-    this.eventHandlers = eventHandlers;
-
-    view.init(changeDetector, elementInjectors, rootElementInjectors,
-      viewContainers, preBuiltObjects, componentChildViews);
-
-    return view;
-  }
-
-  returnToPool(view: View) {
-    this._viewPool.push(view);
   }
 
   /**

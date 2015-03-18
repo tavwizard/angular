@@ -11,6 +11,7 @@ import {Directive, onChange, onDestroy} from 'angular2/src/core/annotations/anno
 import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config'
 import * as pclModule from 'angular2/src/core/compiler/private_component_location';
 import {reflector} from 'angular2/src/reflection/reflection';
+import {ViewFactory} from './view_factory';
 
 var _MAX_DIRECTIVE_CONSTRUCTION_COUNTER = 10;
 
@@ -26,6 +27,7 @@ class StaticKeys {
   viewContainerId:number;
   bindingPropagationConfigId:number;
   privateComponentLocationId:number;
+  viewFactoryId:number;
 
   constructor() {
     //TODO: vsavkin Key.annotate(Key.get(View), 'static')
@@ -34,6 +36,7 @@ class StaticKeys {
     this.viewContainerId = Key.get(ViewContainer).id;
     this.bindingPropagationConfigId = Key.get(BindingPropagationConfig).id;
     this.privateComponentLocationId = Key.get(pclModule.PrivateComponentLocation).id;
+    this.viewFactoryId = Key.get(ViewFactory).id;
   }
 
   static instance() {
@@ -164,12 +167,14 @@ export class PreBuiltObjects {
   element:NgElement;
   viewContainer:ViewContainer;
   bindingPropagationConfig:BindingPropagationConfig;
-  constructor(view, element:NgElement, viewContainer:ViewContainer,
+  viewFactory:ViewFactory;
+  constructor(viewFactory:ViewFactory, view, element:NgElement, viewContainer:ViewContainer,
               bindingPropagationConfig:BindingPropagationConfig) {
     this.view = view;
     this.element = element;
     this.viewContainer = viewContainer;
     this.bindingPropagationConfig = bindingPropagationConfig;
+    this.viewFactory = viewFactory;
   }
 }
 
@@ -601,9 +606,11 @@ export class ElementInjector extends TreeNode {
     if (keyId === staticKeys.ngElementId) return this._preBuiltObjects.element;
     if (keyId === staticKeys.viewContainerId) return this._preBuiltObjects.viewContainer;
     if (keyId === staticKeys.bindingPropagationConfigId) return this._preBuiltObjects.bindingPropagationConfig;
-
+    if (keyId === staticKeys.viewFactoryId) return this._preBuiltObjects.viewFactory;
     if (keyId === staticKeys.privateComponentLocationId) {
-      return new pclModule.PrivateComponentLocation(this, this._preBuiltObjects.element, this._preBuiltObjects.view);
+      return new pclModule.PrivateComponentLocation(
+        this._preBuiltObjects.viewFactory, this, this._preBuiltObjects.element, this._preBuiltObjects.view
+      );
     }
 
     //TODO add other objects as needed

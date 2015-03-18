@@ -6,11 +6,13 @@ import {ChangeDetection, Parser} from 'angular2/change_detection';
 
 import {DirectiveMetadataReader} from './directive_metadata_reader';
 import {ProtoView} from './view';
+import {ElementBinder} from './element_binder';
 import {CompilePipeline} from './pipeline/compile_pipeline';
 import {CompileElement} from './pipeline/compile_element';
 import {createDefaultSteps} from './pipeline/default_steps';
 import {TemplateLoader} from './template_loader';
 import {TemplateResolver} from './template_resolver';
+import {Component} from '../annotations/annotations';
 import {Template} from '../annotations/template';
 import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {CompileStep} from './pipeline/compile_step';
@@ -161,12 +163,7 @@ export class Compiler {
 
     // Compile all the components from the template
     var nestedPVPromises = [];
-    for (var i = 0; i < compileElements.length; i++) {
-      var ce = compileElements[i];
-      if (ce.hasNestedView) {
-        this._compileNestedProtoView(ce, nestedPVPromises);
-      }
-    }
+    this._compileNestedProtoViews(protoView, nestedPVPromises);
 
     if (protoView.render.stylePromises.length > 0) {
       // The protoView is ready after all asynchronous styles are ready
@@ -186,16 +183,30 @@ export class Compiler {
     return protoView;
   }
 
-  _compileNestedProtoView(ce: CompileElement, promises: List<Promise>) {
-    var protoView = this._compile(ce.componentDirective.type);
+  _compileNestedProtoViews(protoView: ProtoView, promises: List<Promise>) {
+    for (var i=0; i<protoView.elementBinders.length; i++) {
+      var eb = protoView.elementBinders[i];
+      // TODOz: Maybe store a flag in the ElementBinder for this so we don't
+      // have to do instanceof check here?
+      // Ignore DyanmicComponents...
+      if (isPresent(eb.componentDirective) && eb.componentDirective.annotation instanceof Component) {
+        this._compileNestedProtoView(eb, promises);
+      } else if (isPresent(eb.viewportDirective)) {
+        this._compileNestedProtoViews(eb.nestedProtoView, promises);
+      }
+    }
+  }
+
+  _compileNestedProtoView(elementBinder: ElementBinder, promises: List<Promise>) {
+    var protoView = this._compile(elementBinder.componentDirective.type);
 
     if (PromiseWrapper.isPromise(protoView)) {
       ListWrapper.push(
         promises,
-        protoView.then(function(pv) { ce.inheritedElementBinder.nestedProtoView = pv;})
+        protoView.then(function(pv) { elementBinder.nestedProtoView = pv;})
       );
     } else {
-      ce.inheritedElementBinder.nestedProtoView = protoView;
+      elementBinder.nestedProtoView = protoView;
     }
   }
 

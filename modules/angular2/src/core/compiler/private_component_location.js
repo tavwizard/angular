@@ -6,17 +6,19 @@ import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strat
 import {EventManager} from 'angular2/src/render/events/event_manager';
 import {ListWrapper} from 'angular2/src/facade/collection';
 import {Type} from 'angular2/src/facade/lang';
-
+import {ViewFactory} from './view_factory';
 
 export class PrivateComponentLocation {
   _elementInjector:eiModule.ElementInjector;
   _elt:NgElement;
   _view:viewModule.View;
+  _viewFactory:ViewFactory;
 
-  constructor(elementInjector:eiModule.ElementInjector, elt:NgElement, view:viewModule.View){
+  constructor(viewFactory:ViewFactory, elementInjector:eiModule.ElementInjector, elt:NgElement, view:viewModule.View){
     this._elementInjector = elementInjector;
     this._elt = elt;
     this._view = view;
+    this._viewFactory = viewFactory;
   }
 
   createComponent(type:Type, annotation:Directive, componentProtoView:viewModule.ProtoView,
@@ -24,16 +26,16 @@ export class PrivateComponentLocation {
     var context = this._elementInjector.createPrivateComponent(type, annotation);
 
     var renderView = componentProtoView.render.instantiate(eventManager);
-    renderView.hydrate(null);
-    var view = componentProtoView.instantiate(renderView, this._elementInjector, eventManager);
-    view.hydrate(this._elementInjector.getShadowDomAppInjector(), this._elementInjector, context, null);
+    var view = this._viewFactory.getView(renderView, componentProtoView, this._elementInjector, eventManager);
 
     this._view.render.setComponentView(
       this._elementInjector.getElementBinderIndex(),
       renderView
     );
-
     ListWrapper.push(this._view.componentChildViews, view);
+
+    renderView.hydrate(null);
+    view.hydrate(this._elementInjector.getShadowDomAppInjector(), this._elementInjector, context, null);
     this._view.changeDetector.addChild(view.changeDetector);
   }
 }

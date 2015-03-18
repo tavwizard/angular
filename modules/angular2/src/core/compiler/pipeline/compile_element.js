@@ -30,7 +30,6 @@ export class CompileElement {
   decoratorDirectives:List<DirectiveMetadata>;
   viewportDirective:DirectiveMetadata;
   componentDirective:DirectiveMetadata;
-  hasNestedView:boolean;
   _allDirectives:List<DirectiveMetadata>;
   isViewRoot:boolean;
   hasBindings:boolean;
@@ -55,7 +54,6 @@ export class CompileElement {
     this.decoratorDirectives = null;
     this.viewportDirective = null;
     this.componentDirective = null;
-    this.hasNestedView = false;
     this._allDirectives = null;
     this.isViewRoot = false;
     this.hasBindings = false;
@@ -159,7 +157,6 @@ export class CompileElement {
       this.viewportDirective = directive;
     } else if (annotation instanceof Component) {
       this.componentDirective = directive;
-      this.hasNestedView = true;
     } else if (annotation instanceof DynamicComponent) {
       this.componentDirective = directive;
     }

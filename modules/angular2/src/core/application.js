@@ -25,6 +25,7 @@ import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
 import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
 import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
 import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
+import {ViewFactory, VIEW_POOL_CAPACITY} from 'angular2/src/core/compiler/view_factory';
 
 var _rootInjector: Injector;
 
@@ -41,6 +42,9 @@ export var appDocumentToken = new OpaqueToken('AppDocument');
 
 function _injectorBindings(appComponentType): List<Binding> {
   return [
+      // Default capacity, can be overwritten later...
+      bind(VIEW_POOL_CAPACITY).toValue(100),
+      bind(ViewFactory).toFactory( (capacity) => new ViewFactory(capacity), [VIEW_POOL_CAPACITY]),
       bind(appDocumentToken).toValue(DOM.defaultDoc()),
       bind(appComponentAnnotatedTypeToken).toFactory((reader) => {
         // TODO(rado): investigate whether to support bindings on root component.
@@ -57,7 +61,7 @@ function _injectorBindings(appComponentType): List<Binding> {
       }, [appComponentAnnotatedTypeToken, appDocumentToken]),
 
       bind(appViewToken).toAsyncFactory((changeDetection, compiler, injector, appElement,
-        appComponentAnnotatedType, strategy, eventManager) => {
+        appComponentAnnotatedType, strategy, eventManager, viewFactory) => {
         return compiler.compile(appComponentAnnotatedType.type).then(
             (protoView) => {
           var appProtoView = ProtoView.createRootProtoView(protoView, appElement,
@@ -66,12 +70,13 @@ function _injectorBindings(appComponentType): List<Binding> {
           // The light Dom of the app element is not considered part of
           // the angular application. Thus the context and lightDomInjector are
           // empty.
-          var view = appProtoView.instantiate(null, eventManager);
+          var appRenderView = null; // TODO(tbosch): fill this!
+          var view = viewFactory.getView(appProtoView, appRenderView, null, eventManager);
           view.hydrate(injector, null, null, new Object(), null);
           return view;
         });
       }, [ChangeDetection, Compiler, Injector, appElementToken, appComponentAnnotatedTypeToken,
-          ShadowDomStrategy, EventManager]),
+          ShadowDomStrategy, EventManager, ViewFactory]),
 
       bind(appChangeDetectorToken).toFactory((rootView) => rootView.changeDetector,
           [appViewToken]),

@@ -41,10 +41,11 @@ import {EventEmitter} from 'angular2/src/core/annotations/di';
 import {If} from 'angular2/src/directives/if';
 
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
+import {ViewFactory} from 'angular2/src/core/compiler/view_factory';
 
 export function main() {
   ddescribe('integration tests', function() {
-    var directiveMetadataReader, shadowDomStrategy, compiler, tplResolver;
+    var directiveMetadataReader, shadowDomStrategy, compiler, tplResolver, viewFactory;
 
     function createCompiler(tplResolver, changedDetection) {
       var urlResolver = new UrlResolver();
@@ -70,13 +71,14 @@ export function main() {
       shadowDomStrategy = new EmulatedUnscopedShadowDomStrategy(new StyleUrlResolver(urlResolver), null);
 
       compiler = createCompiler(tplResolver, dynamicChangeDetection);
+      viewFactory = new ViewFactory(0);
     });
 
     describe('react to record changes', function() {
       var view, ctx, cd;
       function createView(pv) {
         ctx = new MyComp();
-        view = pv.instantiate(pv.render.instantiate(null), null, null);
+        view = viewFactory.getView(pv.render.instantiate(null), pv, null, null);
         view.render.hydrate(null);
         view.hydrate(new Injector([
           bind(Compiler).toValue(compiler),

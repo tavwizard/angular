@@ -6,11 +6,13 @@ import * as eiModule from 'angular2/src/core/compiler/element_injector';
 import {isPresent, isBlank} from 'angular2/src/facade/lang';
 import {EventManager} from 'angular2/src/render/events/event_manager';
 import {RenderViewContainer} from 'angular2/src/render/render_view_container';
+import * as vfModule from './view_factory';
 
 /**
  * @publicModule angular2/angular2
  */
 export class ViewContainer {
+  _viewFactory: vfModule.ViewFactory;
   parentView: viewModule.View;
   defaultProtoView: viewModule.ProtoView;
   _views: List<viewModule.View>;
@@ -20,11 +22,13 @@ export class ViewContainer {
   hostElementInjector: eiModule.ElementInjector;
   render: RenderViewContainer;
 
-  constructor(renderViewContainer: RenderViewContainer,
+  constructor(viewFactory: vfModule.ViewFactory,
+              renderViewContainer: RenderViewContainer,
               parentView: viewModule.View,
               defaultProtoView: viewModule.ProtoView,
               elementInjector: eiModule.ElementInjector,
               eventManager: EventManager) {
+    this._viewFactory = viewFactory;
     this.render = renderViewContainer;
     this.parentView = parentView;
     this.defaultProtoView = defaultProtoView;
@@ -75,8 +79,8 @@ export class ViewContainer {
     var renderView = this.render.create(atIndex);
 
     // TODO(rado): replace with viewFactory.
-    var newView = this.defaultProtoView.instantiate(
-      renderView, this.hostElementInjector, this._eventManager
+    var newView = this._viewFactory.getView(renderView, defaultProtoView,
+      this.hostElementInjector, this._eventManager
     );
     // insertion must come before hydration so that element injector trees are attached.
     this._insert(newView, atIndex);
@@ -110,7 +114,7 @@ export class ViewContainer {
     var view = this._detach(atIndex);
     view.dehydrate();
     // TODO(rado): this needs to be delayed until after any pending animations.
-    this.defaultProtoView.returnToPool(view);
+    this._viewFactory.returnView(view);
     // view is intentionally not returned to the client.
   }
 
