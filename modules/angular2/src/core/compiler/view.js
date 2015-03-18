@@ -12,7 +12,6 @@ import {IMPLEMENTS, int, isPresent, isBlank, BaseException} from 'angular2/src/f
 import {Injector} from 'angular2/di';
 import {NgElement} from 'angular2/src/render/ng_element';
 import {ViewContainer} from './view_container';
-import {ViewPool} from './view_pool';
 import {EventManager} from 'angular2/src/render/events/event_manager';
 
 import {ProtoRenderView, RenderView} from 'angular2/src/render/render_view';

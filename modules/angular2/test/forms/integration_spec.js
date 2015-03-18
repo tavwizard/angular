@@ -62,7 +62,7 @@ export function main() {
     }));
 
     compiler.compile(componentType).then((pv) => {
-      var view = pv.instantiate(null, null, pv.render.instantiate(null));
+      var view = pv.instantiate(null, null);
       view.hydrate(new Injector([]), null, null, context, null);
       detectChanges(view);
       callback(view);
