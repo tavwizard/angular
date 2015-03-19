@@ -31,7 +31,10 @@ export class ViewFactory {
     for (var i=0; i<this._pooledViews.length; i++) {
       var pooledView = this._pooledViews[i];
       if (pooledView.protoView === protoView) {
-        return ListWrapper.removeAt(this._pooledViews, i);
+        var res = ListWrapper.removeAt(this._pooledViews, i);
+        // TODOz: add an API to View for this!
+        res.render = renderView;
+        return res;
       }
     }
     return this._createView(renderView, protoView, hostElementInjector, eventManager);
@@ -40,6 +43,8 @@ export class ViewFactory {
 
   returnView(view:View) {
     ListWrapper.push(this._pooledViews, view);
+    // TODOz: add an API to View for this!
+    view.render = null;
     while (this._pooledViews.length > this._poolCapacity) {
       ListWrapper.removeAt(this._pooledViews, 0);
     }
