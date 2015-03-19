@@ -13,6 +13,8 @@ import {CompileElement} from './compile_element';
 import {CompileControl} from './compile_control';
 import {dashCaseToCamelCase, camelCaseToDashCase} from './util';
 
+import {ElementBinderBuilder, DirectiveBinderBuilder} from '../proto_view_builder';
+
 var DOT_REGEXP = RegExpWrapper.create('\\.');
 
 const ARIA_PREFIX = 'aria';
@@ -126,7 +128,7 @@ export function isSpecialProperty(propName:string) {
  * and only needs the actual HTMLElement for the ones
  * with the flag `isViewRoot`.
  */
-export class ElementBinderBuilder extends CompileStep {
+export class ElementBinderBuilderCS extends CompileStep {
   _parser:Parser;
   constructor(parser:Parser) {
     super();
@@ -142,36 +144,48 @@ export class ElementBinderBuilder extends CompileStep {
     }
     if (current.hasBindings) {
       var protoView = current.inheritedProtoView;
-      var protoInjectorWasBuilt = isBlank(parent) ? true :
-          current.inheritedProtoElementInjector !== parent.inheritedProtoElementInjector;
-
-      var currentProtoElementInjector = protoInjectorWasBuilt ?
-          current.inheritedProtoElementInjector : null;
-
-      var renderBinder = protoView.render.bindElement(
-          isPresent(parentElementBinder) ? parentElementBinder.render : null,
-          distanceToParentBinder,
-          isPresent(current.viewportDirective)
-      );
-      elementBinder = protoView.bindElement(renderBinder,
-          currentProtoElementInjector, current.componentDirective, current.viewportDirective);
+      elementBinder = protoView.bindElement();
+      if (isPresent(parentElementBinder)) {
+        elementBinder.setParent(parentElementBinder, distanceToParentBinder);
+      }
       current.distanceToParentBinder = 0;
 
       if (isPresent(current.textNodeBindings)) {
-        this._bindTextNodes(protoView, current);
+        this._bindTextNodes(elementBinder, current);
       }
       if (isPresent(current.propertyBindings)) {
-        this._bindElementProperties(protoView, current);
+        this._bindElementProperties(elementBinder, current);
       }
       if (isPresent(current.eventBindings)) {
-        this._bindEvents(protoView, current);
+        this._bindElementEvents(elementBinder, current);
       }
       if (isPresent(current.contentTagSelector)) {
-        elementBinder.render.contentTagSelector = current.contentTagSelector;
+        elementBinder.setContentTagSelector(current.contentTagSelector);
       }
-      var directives = current.getAllDirectives();
-      this._bindDirectiveProperties(directives, current);
-      this._bindDirectiveEvents(directives, current);
+      if (isPresent(current.componentDirective)) {
+        this._bindDirective(
+          current.componentDirective, elementBinder, current
+        ).setComponent(true);
+      }
+      if (isPresent(current.viewportDirective)) {
+        this._bindDirective(
+          current.viewportDirective, elementBinder, current
+        ).setViewport(true);
+      }
+      if (isPresent(current.decoratorDirectives)) {
+        ListWrapper.forEach((directive) => {
+          this._bindDirective(
+            directive, elementBinder, current
+          );
+        });
+      }
+      // Viewport directives are treated differently than other element with var- definitions.
+      // See proto_view_builder compile step
+      if (isPresent(current.variableBindings) && !isPresent(current.viewportDirective)) {
+        MapWrapper.forEach(current.variableBindings, (mappedName, varName) => {
+          elementBinder.bindVariable(varName, mappedName);
+        });
+      }
     } else if (isPresent(parent)) {
       elementBinder = parentElementBinder;
       current.distanceToParentBinder = distanceToParentBinder;
@@ -183,13 +197,13 @@ export class ElementBinderBuilder extends CompileStep {
     return isPresent(parent) ? parent.distanceToParentBinder + 1 : 0;
   }
 
-  _bindTextNodes(protoView, compileElement) {
+  _bindTextNodes(elementBuilder:ElementBinderBuilder, compileElement) {
     MapWrapper.forEach(compileElement.textNodeBindings, (expression, indexInParent) => {
-      protoView.bindTextNode(indexInParent, expression);
+      elementBuilder.bindText(indexInParent, expression);
     });
   }
 
-  _bindElementProperties(protoView, compileElement) {
+  _bindElementProperties(elementBuilder:ElementBinderBuilder, compileElement) {
     MapWrapper.forEach(compileElement.propertyBindings, (expression, property) => {
       var setterFn, styleParts, styleSuffix;
 
@@ -214,65 +228,60 @@ export class ElementBinderBuilder extends CompileStep {
       }
 
       if (isPresent(setterFn)) {
-        protoView.bindElementProperty(expression.ast, property, setterFn);
+        elementBuilder.bindProperty(expression.ast, property, setterFn);
       }
     });
   }
 
-  _bindEvents(protoView, compileElement) {
+  _bindElementEvents(elementBuilder:ElementBinderBuilder, compileElement) {
     MapWrapper.forEach(compileElement.eventBindings, (expression, eventName) => {
-      protoView.bindEvent(eventName,  expression);
+      elementBuilder.bindEvent(eventName,  expression);
     });
   }
 
-  _bindDirectiveEvents(directives: List<DirectiveMetadata>, compileElement: CompileElement) {
-    for (var directiveIndex = 0; directiveIndex < directives.length; directiveIndex++) {
-      var directive = directives[directiveIndex];
-      var annotation = directive.annotation;
-      if (isBlank(annotation.events)) continue;
-      var protoView = compileElement.inheritedProtoView;
-      StringMapWrapper.forEach(annotation.events, (action, eventName) => {
-        var expression = this._parser.parseAction(action, compileElement.elementDescription);
-        protoView.bindEvent(eventName, expression, directiveIndex);
-      });
-    }
+  _bindDirective(directive:DirectiveMetadata, elementBinderBuilder: ElementBinderBuilder, compileElement: CompileElement):DirectiveBinderBuilder {
+    var directiveBuilder = elementBinderBuilder.bindDirective(directive);
+    var annotation = directive.annotation;
+    this._bindDirectiveEvents(annotation.events, directiveBuilder, compileElement);
+    this._bindDirectiveProperties(annotation.bind, directiveBuilder, compileElement);
+    return directiveBuilder;
   }
 
-  _bindDirectiveProperties(directives: List<DirectiveMetadata>,
-                           compileElement: CompileElement) {
-    var protoView = compileElement.inheritedProtoView;
+  _bindDirectiveEvents(events, directiveBuilder:DirectiveBinderBuilder, compileElement:CompileElement) {
+    if (isBlank(annotation.events)) return;
+    StringMapWrapper.forEach(annotation.events, (action, eventName) => {
+      var expression = this._parser.parseAction(action, compileElement.elementDescription);
+      directiveBuilder.bindEvent(eventName, expression);
+    });
+  }
 
-    for (var directiveIndex = 0; directiveIndex < directives.length; directiveIndex++) {
-      var directive = ListWrapper.get(directives, directiveIndex);
-      var annotation = directive.annotation;
-      if (isBlank(annotation.bind)) continue;
-      StringMapWrapper.forEach(annotation.bind, (bindConfig, dirProp) => {
-        var pipes = this._splitBindConfig(bindConfig);
-        var elProp = ListWrapper.removeAt(pipes, 0);
+  _bindDirectiveProperties(bind, directiveBuilder:DirectiveBinderBuilder, compileElement:CompileElement) {
+    if (isBlank(bind)) continue;
+    StringMapWrapper.forEach(bind, (bindConfig, dirProp) => {
+      var pipes = this._splitBindConfig(bindConfig);
+      var elProp = ListWrapper.removeAt(pipes, 0);
 
-        var bindingAst = isPresent(compileElement.propertyBindings) ?
-          MapWrapper.get(compileElement.propertyBindings, dashCaseToCamelCase(elProp)) :
-            null;
+      var bindingAst = isPresent(compileElement.propertyBindings) ?
+        MapWrapper.get(compileElement.propertyBindings, dashCaseToCamelCase(elProp)) :
+          null;
 
-        if (isBlank(bindingAst)) {
-          var attributeValue = MapWrapper.get(compileElement.attrs(), elProp);
-          if (isPresent(attributeValue)) {
-            bindingAst = this._parser.wrapLiteralPrimitive(attributeValue, compileElement.elementDescription);
-          }
+      if (isBlank(bindingAst)) {
+        var attributeValue = MapWrapper.get(compileElement.attrs(), elProp);
+        if (isPresent(attributeValue)) {
+          bindingAst = this._parser.wrapLiteralPrimitive(attributeValue, compileElement.elementDescription);
         }
+      }
 
-        // Bindings are optional, so this binding only needs to be set up if an expression is given.
-        if (isPresent(bindingAst)) {
-          var fullExpAstWithBindPipes = this._parser.addPipes(bindingAst, pipes);
-          protoView.bindDirectiveProperty(
-            directiveIndex,
-            fullExpAstWithBindPipes,
-            dirProp,
-            reflector.setter(dashCaseToCamelCase(dirProp))
-          );
-        }
-      });
-    }
+      // Bindings are optional, so this binding only needs to be set up if an expression is given.
+      if (isPresent(bindingAst)) {
+        var fullExpAstWithBindPipes = this._parser.addPipes(bindingAst, pipes);
+        directiveBuilder.bindProperty(
+          fullExpAstWithBindPipes,
+          dirProp,
+          reflector.setter(dashCaseToCamelCase(dirProp))
+        );
+      }
+    });
   }
 
   _splitBindConfig(bindConfig:string) {

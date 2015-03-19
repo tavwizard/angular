@@ -91,7 +91,7 @@ export function main() {
         cd = view.changeDetector;
       }
 
-      it('should consume text node changes', inject([AsyncTestCompleter], (async) => {
+      iit('should consume text node changes', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div>{{ctxProp}}</div>'}));
         compiler.compile(MyComp).then((pv) => {
           createView(pv);

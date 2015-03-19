@@ -3,9 +3,7 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {int, isBlank, isPresent, Type, StringJoiner, assertionsEnabled} from 'angular2/src/facade/lang';
 import {DirectiveMetadata} from '../directive_metadata';
 import {Decorator, Component, Viewport, DynamicComponent} from '../../annotations/annotations';
-import {ElementBinder} from '../element_binder';
-import {ProtoElementInjector} from '../element_injector';
-import {ProtoView} from '../view';
+import {ProtoViewBuilder, ElementBinderBuilder} from '../proto_view_builder';
 import {dashCaseToCamelCase} from './util';
 
 import {AST} from 'angular2/change_detection';
@@ -30,13 +28,10 @@ export class CompileElement {
   decoratorDirectives:List<DirectiveMetadata>;
   viewportDirective:DirectiveMetadata;
   componentDirective:DirectiveMetadata;
-  _allDirectives:List<DirectiveMetadata>;
   isViewRoot:boolean;
   hasBindings:boolean;
-  inheritedProtoView:ProtoView;
-  inheritedProtoElementInjector:ProtoElementInjector;
-  inheritedElementBinder:ElementBinder;
-  distanceToParentInjector:int;
+  inheritedProtoView:ProtoViewBuilder;
+  inheritedElementBinder:ElementBinderBuilder;
   distanceToParentBinder:int;
   compileChildren: boolean;
   ignoreBindings: boolean;
@@ -54,19 +49,14 @@ export class CompileElement {
     this.decoratorDirectives = null;
     this.viewportDirective = null;
     this.componentDirective = null;
-    this._allDirectives = null;
     this.isViewRoot = false;
     this.hasBindings = false;
     // inherited down to children if they don't have
     // an own protoView
     this.inheritedProtoView = null;
     // inherited down to children if they don't have
-    // an own protoElementInjector
-    this.inheritedProtoElementInjector = null;
-    // inherited down to children if they don't have
     // an own elementBinder
     this.inheritedElementBinder = null;
-    this.distanceToParentInjector = 0;
     this.distanceToParentBinder = 0;
     this.compileChildren = true;
     // set to true to ignore all the bindings on the element
@@ -162,24 +152,6 @@ export class CompileElement {
     }
   }
 
-  getAllDirectives(): List<DirectiveMetadata> {
-    if (this._allDirectives === null) {
-      // Collect all the directives
-      // When present the component directive must be first
-      var directives = ListWrapper.create();
-      if (isPresent(this.componentDirective)) {
-        ListWrapper.push(directives, this.componentDirective);
-      }
-      if (isPresent(this.viewportDirective)) {
-        ListWrapper.push(directives, this.viewportDirective);
-      }
-      if (isPresent(this.decoratorDirectives)) {
-        directives = ListWrapper.concat(directives, this.decoratorDirectives);
-      }
-      this._allDirectives = directives;
-    }
-    return this._allDirectives;
-  }
 }
 
 // return an HTML representation of an element start tag - without its content

@@ -6,9 +6,8 @@ import {TextInterpolationParser} from './text_interpolation_parser';
 import {DirectiveParser} from './directive_parser';
 import {ViewSplitter} from './view_splitter';
 import {ElementBindingMarker} from './element_binding_marker';
-import {ProtoViewBuilder} from './proto_view_builder';
-import {ProtoElementInjectorBuilder} from './proto_element_injector_builder';
-import {ElementBinderBuilder} from './element_binder_builder';
+import {ProtoViewBuilderCS} from './proto_view_builder';
+import {ElementBinderBuilderCS} from './element_binder_builder';
 
 import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
@@ -20,7 +19,6 @@ import {ShadowDomStrategy, EmulatedScopedShadowDomStrategy} from 'angular2/src/r
  * ProtoElementInjectors and ElementBinders in the end.
  */
 export function createDefaultSteps(
-    changeDetection:ChangeDetection,
     parser:Parser,
     compiledComponent: DirectiveMetadata,
     directives: List<DirectiveMetadata>,
@@ -36,9 +34,8 @@ export function createDefaultSteps(
     new DirectiveParser(directives),
     new TextInterpolationParser(parser),
     new ElementBindingMarker(),
-    new ProtoViewBuilder(changeDetection, shadowDomStrategy),
-    new ProtoElementInjectorBuilder(),
-    new ElementBinderBuilder(parser),
+    new ProtoViewBuilderCS(),
+    new ElementBinderBuilderCS(parser),
   ];
 
   return steps;

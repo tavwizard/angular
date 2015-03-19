@@ -11,8 +11,9 @@ export class RenderElementBinder {
   index:int;
   distanceToParent:int;
   constructor(
-    index:int, parent:RenderElementBinder, distanceToParent: int,
-    isViewContainer:boolean) {
+      index:int, parent:RenderElementBinder, distanceToParent: int,
+      isViewContainer:boolean, textNodeIndices:List<int>, contentTagSelector:string,
+      nestedProtoView:ProtoRenderView) {
     if (isBlank(index)) {
       throw new BaseException('null index not allowed.');
     }
@@ -21,11 +22,8 @@ export class RenderElementBinder {
     this.index = index;
     this.distanceToParent = distanceToParent;
     this.isViewContainer = isViewContainer;
-    // updated later
-    this.nestedProtoView = null;
-    // updated later when text nodes are bound
-    this.textNodeIndices = null;
-    // updated later in the compilation pipeline
-    this.contentTagSelector = null;
+    this.nestedProtoView = nestedProtoView;
+    this.textNodeIndices = textNodeIndices;
+    this.contentTagSelector = contentTagSelector;
   }
 }

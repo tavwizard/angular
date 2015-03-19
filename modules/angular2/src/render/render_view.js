@@ -158,33 +158,17 @@ export class ProtoRenderView {
 
   constructor(
       template,
-      shadowDomStrategy:ShadowDomStrategy) {
+      shadowDomStrategy:ShadowDomStrategy,
+      elementBinders:List<RenderElementBinder>) {
     this.element = template;
-    this.elementBinders = [];
+    this.elementBinders = elementBinders;
     this.instantiateInPlace = false;
     this.rootBindingOffset = (isPresent(this.element) && DOM.hasClass(this.element, NG_BINDING_CLASS))
       ? 1 : 0;
     this.isTemplateElement = DOM.isTemplateElement(this.element);
     this.shadowDomStrategy = shadowDomStrategy;
+    // TODO(tbosch): We should keep this state somewhere else...
     this.stylePromises = [];
-  }
-
-  bindElement(parent:RenderElementBinder, distanceToParent:int, isViewContainer:boolean = false):RenderElementBinder {
-    var elBinder = new RenderElementBinder(this.elementBinders.length, parent, distanceToParent,
-        isViewContainer);
-    ListWrapper.push(this.elementBinders, elBinder);
-    return elBinder;
-  }
-
-  /**
-   * Adds a text node binding for the last created RenderElementBinder via bindElement
-   */
-  bindTextNode(indexInParent:int) {
-    var elBinder = this.elementBinders[this.elementBinders.length-1];
-    if (isBlank(elBinder.textNodeIndices)) {
-      elBinder.textNodeIndices = ListWrapper.create();
-    }
-    ListWrapper.push(elBinder.textNodeIndices, indexInParent);
   }
 
   // Create a rootView as if the compiler encountered <rootcmp></rootcmp>,

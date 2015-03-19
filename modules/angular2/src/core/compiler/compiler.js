@@ -97,7 +97,7 @@ export class Compiler {
 
     var templateUrl = this._templateLoader.getTemplateUrl(template);
 
-    return createDefaultSteps(this._changeDetection, this._parser, cmpMetadata, dirMetadata,
+    return createDefaultSteps(this._parser, cmpMetadata, dirMetadata,
       this._shadowDomStrategy, templateUrl, this._cssProcessor);
   }
 
@@ -148,13 +148,15 @@ export class Compiler {
     var pipeline = new CompilePipeline(this.createSteps(component, template));
     var compileElements;
 
-    try {
+    // TODOz uncomment try/catch again
+    // try {
       compileElements = pipeline.process(tplElement, stringify(component));
-    } catch(ex) {
-      return PromiseWrapper.reject(ex);
-    }
+    // } catch(ex) {
+    //   return PromiseWrapper.reject(ex);
+    // }
 
-    var protoView = compileElements[0].inheritedProtoView;
+    // TODOz: We might have to add more parameters here...
+    var protoView = compileElements[0].inheritedProtoView.build(this._changeDetection, this._shadowDomStrategy);
 
     // Populate the cache before compiling the nested components,
     // so that components can reference themselves in their template.

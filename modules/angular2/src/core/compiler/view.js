@@ -259,7 +259,6 @@ export class ProtoView {
   protoChangeDetector:ProtoChangeDetector;
   variableBindings: Map;
   protoLocals:Map;
-  textNodesWithBindingCount:int;
   // List<Map<eventName, handler>>, indexed by binder index
   eventHandlers:List;
   bindingRecords:List;
@@ -270,17 +269,22 @@ export class ProtoView {
   constructor(
       protoRenderView: ProtoRenderView,
       protoChangeDetector:ProtoChangeDetector,
-      parentProtoView:ProtoView = null) {
+      elementBinders:List<ElementBinder>,
+      eventHandlers:List,
+      bindingRecords:List,
+      variableBindings:List,
+      protoLocals:Map) {
     this.render = protoRenderView;
-    this.elementBinders = [];
+    this.elementBinders = elementBinders;
     this.variableBindings = MapWrapper.create();
-    this.protoLocals = MapWrapper.create();
+    this.protoLocals = protoLocals;
     this.protoChangeDetector = protoChangeDetector;
-    this.parentProtoView = parentProtoView;
-    this.textNodesWithBindingCount = 0;
-    this.eventHandlers = [];
-    this.bindingRecords = [];
-    this._variableBindings = null;
+    this.eventHandlers = eventHandlers;
+    this.bindingRecords = bindingRecords;
+    this._variableBindings = variableBindings;
+    // Updated later so we can resolve the cyclic dependency:
+    // ProtoView.parent vs elementBinder.nestedProtoView
+    this.parentProtoView = null;
   }
 
   // this work should be done the constructor of ProtoView once we separate
@@ -328,37 +332,16 @@ export class ProtoView {
     }
   }
 
+  // TODOz move to builder!
   bindVariable(contextName:string, templateName:string) {
     MapWrapper.set(this.variableBindings, contextName, templateName);
     MapWrapper.set(this.protoLocals, templateName, null);
   }
 
-  bindElement(renderElementBinder:RenderElementBinder, protoElementInjector:ProtoElementInjector,
-      componentDirective:DirectiveMetadata = null, viewportDirective:DirectiveMetadata = null):ElementBinder {
-    var elBinder = new ElementBinder(
-      renderElementBinder, protoElementInjector, componentDirective, viewportDirective
-    );
-    ListWrapper.push(this.elementBinders, elBinder);
-    return elBinder;
-  }
-
-  /**
-   * Adds a text node binding for the last created ElementBinder via bindElement
-   */
-  bindTextNode(indexInParent:int, expression:AST) {
-    this.render.bindTextNode(indexInParent);
-    var elBinder = this.elementBinders[this.elementBinders.length-1];
-    if (isBlank(elBinder.textNodeIndices)) {
-      elBinder.textNodeIndices = ListWrapper.create();
-    }
-    ListWrapper.push(elBinder.textNodeIndices, indexInParent);
-    var memento = this.textNodesWithBindingCount++;
-    ListWrapper.push(this.bindingRecords, new BindingRecord(expression, memento, null));
-  }
-
   /**
    * Adds an element property binding for the last created ElementBinder via bindElement
    */
+  // TODOz move to builder!
   bindElementProperty(expression:AST, setterName:string, setter:SetterFn) {
     var elBinder = this.elementBinders[this.elementBinders.length-1];
     var memento = new ElementBindingMemento(this.elementBinders.length-1, setterName, setter);
@@ -378,6 +361,7 @@ export class ProtoView {
    * @param {int} directiveIndex The directive index in the binder or -1 when the event is not bound
    *                             to a directive
    */
+  // TODOz move to builder!
   bindEvent(eventName:string, expression:AST, directiveIndex: int = -1) {
     var elBinder = this.elementBinders[this.elementBinders.length - 1];
     var events = elBinder.events;
@@ -396,6 +380,7 @@ export class ProtoView {
   /**
    * Adds a directive property binding for the last created ElementBinder via bindElement
    */
+  // TODOz move to builder!
   bindDirectiveProperty(
     directiveIndex:number,
     expression:AST,

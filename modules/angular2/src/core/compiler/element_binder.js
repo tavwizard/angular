@@ -9,23 +9,17 @@ export class ElementBinder {
   protoElementInjector:eiModule.ProtoElementInjector;
   componentDirective:DirectiveMetadata;
   viewportDirective:DirectiveMetadata;
-  textNodeIndices:List<int>;
   nestedProtoView: ProtoView;
   events:StringMap;
-  render:RenderElementBinder;
   constructor(
-      renderElementBinder: RenderElementBinder,
       protoElementInjector: eiModule.ProtoElementInjector, componentDirective:DirectiveMetadata,
-      viewportDirective:DirectiveMetadata) {
-    this.render = renderElementBinder;
+      viewportDirective:DirectiveMetadata,
+      nestedProtoView: ProtoView,
+      events: StringMap) {
     this.protoElementInjector = protoElementInjector;
     this.componentDirective = componentDirective;
     this.viewportDirective = viewportDirective;
-    // updated later when events are bound
-    this.events = null;
-    // updated later when text nodes are bound
-    this.textNodeIndices = null;
-    // updated later, so we are able to resolve cycles
-    this.nestedProtoView = null;
+    this.nestedProtoView = nestedProtoView;
+    this.events = events;
   }
 }
