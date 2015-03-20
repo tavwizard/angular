@@ -8,16 +8,10 @@ import {Type} from 'angular2/src/facade/lang';
 
 export class PrivateComponentLoader {
   compiler:Compiler;
-  shadowDomStrategy:ShadowDomStrategy;
-  eventManager:EventManager;
   directiveMetadataReader:DirectiveMetadataReader;
 
-  constructor(compiler:Compiler, shadowDomStrategy:ShadowDomStrategy,
-              eventManager:EventManager, directiveMetadataReader:DirectiveMetadataReader) {
-
+  constructor(compiler:Compiler, directiveMetadataReader:DirectiveMetadataReader) {
     this.compiler = compiler;
-    this.shadowDomStrategy = shadowDomStrategy;
-    this.eventManager = eventManager;
     this.directiveMetadataReader = directiveMetadataReader;
   }
 
@@ -26,9 +20,7 @@ export class PrivateComponentLoader {
     return this.compiler.compile(type).then((componentProtoView) => {
       location.createComponent(
         type, annotation,
-        componentProtoView,
-        this.eventManager,
-        this.shadowDomStrategy);
+        componentProtoView);
     });
   }
 }

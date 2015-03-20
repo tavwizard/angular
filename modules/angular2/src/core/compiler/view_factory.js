@@ -1,33 +1,45 @@
-import {OpaqueToken} from 'angular2/di';
+import {OpaqueToken, Injector} from 'angular2/di';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 
-import {ElementInjector, PreBuiltObjects} from './element_injector';
+import {ChangeDetection} from 'angular2/change_detection';
+
+import {ElementInjector, PreBuiltObjects, DirectiveBinding} from './element_injector';
 import {BindingPropagationConfig} from './binding_propagation_config';
 import {int, isPresent, isBlank} from 'angular2/src/facade/lang';
-import {NgElement} from 'angular2/src/render/ng_element';
+import {NgElement} from './ng_element';
 import {ViewContainer} from './view_container';
-import {EventManager} from 'angular2/src/render/events/event_manager';
+import {DirectiveMetadata} from './directive_metadata';
+import {DirectiveMetadataReader} from './directive_metadata_reader';
 
-import {RenderView} from 'angular2/src/render/render_view';
-import {RenderViewFactory} from 'angular2/src/render/render_view_factory';
-import {ProtoView, View} from './view';
+import * as renderApi from 'angular2/render_api';
+import {View} from './view';
+import {ProtoView} from './proto_view';
 
 export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
 
 export class ViewFactory {
   _poolCapacity:number;
   _pooledViews:List<View>;
-  render:RenderViewFactory;
+  _renderer:renderApi.Renderer;
+  _changeDetection: ChangeDetection;
+  _directiveMetadataReader: DirectiveMetadataReader;
 
-  constructor(capacity) {
+  constructor(capacity, renderer:renderApi.Renderer,
+      changeDetection: ChangeDetection, directiveMetadataReader: DirectiveMetadataReader) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
-    this.render = new RenderViewFactory(capacity);
+    this._renderer = renderer;
+    this._changeDetection = changeDetection;
+    this._directiveMetadataReader = directiveMetadataReader;
   }
 
-  getView(renderView:RenderView, protoView:ProtoView, hostElementInjector: ElementInjector, eventManager: EventManager): View {
+  getView(protoView:ProtoView): View {
     // TODO(tbosch): benchmark this scanning of views and maybe
     // replace it with a fancy LRU Map/List combination...
+    // Note: We are getting a new renderView even if
+    // our view is from the pool so that the render side can have its own lifecycle,
+    // e.g. for animations
+    var renderView = this._renderer.createView(protoView.render);
     for (var i=0; i<this._pooledViews.length; i++) {
       var pooledView = this._pooledViews[i];
       if (pooledView.protoView === protoView) {
@@ -37,20 +49,37 @@ export class ViewFactory {
         return res;
       }
     }
-    return this._createView(renderView, protoView, hostElementInjector, eventManager);
+    return this._createView(renderView, protoView);
   }
 
+  getRootView(rootElementSelectorOrElement, component:Type, injector: Injector, protoView:ProtoView): View {
+    // Note: this render view is already hydrated and ready to use!
+    var renderRootView = this._renderer.createRootView(rootElementSelectorOrElement);
+    var rootProtoView = ProtoView.createRootProtoView(
+      protoView,
+      this._directiveMetadataReader.read(component),
+      this._changeDetection.createProtoChangeDetector('root')
+    );
+    var view = this._createView(renderRootView, rootProtoView);
+    view.hydrate(injector, null, new Object(), null);
+    return view;
+  }
 
   returnView(view:View) {
-    ListWrapper.push(this._pooledViews, view);
+    if (view.hydrated()) {
+      view.dehydrate();
+    }
+    this._renderer.destroyView(view.render);
     // TODOz: add an API to View for this!
     view.render = null;
+
+    ListWrapper.push(this._pooledViews, view);
     while (this._pooledViews.length > this._poolCapacity) {
       ListWrapper.removeAt(this._pooledViews, 0);
     }
   }
 
-  _createView(renderView:RenderView, protoView:ProtoView, hostElementInjector: ElementInjector, eventManager: EventManager): View {
+  _createView(renderView:renderApi.View, protoView:ProtoView): View {
     var view = new View(renderView, protoView, protoView.protoLocals);
     var changeDetector = protoView.protoChangeDetector.instantiate(view, protoView.bindingRecords, protoView.getVariableBindings());
     var binders = protoView.elementBinders;
@@ -71,9 +100,9 @@ export class ViewFactory {
       if (isPresent(protoElementInjector)) {
         if (isPresent(protoElementInjector.parent)) {
           var parentElementInjector = elementInjectors[protoElementInjector.parent.index];
-          elementInjector = protoElementInjector.instantiate(parentElementInjector, null);
+          elementInjector = protoElementInjector.instantiate(parentElementInjector);
         } else {
-          elementInjector = protoElementInjector.instantiate(null, hostElementInjector);
+          elementInjector = protoElementInjector.instantiate(null);
           ListWrapper.push(rootElementInjectors, elementInjector);
         }
       }
@@ -82,12 +111,8 @@ export class ViewFactory {
       // componentChildViews
       var bindingPropagationConfig = null;
       if (isPresent(binder.nestedProtoView) && isPresent(binder.componentDirective)) {
-        var childRenderView = this.render.getView(binder.nestedProtoView.render, eventManager);
-        var childView = this.getView(
-          childRenderView, binder.nestedProtoView,
-          elementInjector, eventManager
-        );
-        renderView.setComponentView(binderIdx, childRenderView);
+        var childView = this.getView(binder.nestedProtoView);
+        renderView.setComponentView(binderIdx, childView.render);
         changeDetector.addChild(childView.changeDetector);
 
         bindingPropagationConfig = new BindingPropagationConfig(changeDetector);
@@ -101,7 +126,7 @@ export class ViewFactory {
         viewContainer = new ViewContainer(
           this,
           renderView.viewContainers[binderIdx], view, binder.nestedProtoView,
-          elementInjector, eventManager
+          elementInjector
         );
       }
       viewContainers[binderIdx] = viewContainer;

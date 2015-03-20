@@ -10,7 +10,9 @@ module.exports = function(config) {
     files: [
       // Unit test files needs to be included.
       // Karma-dart generates `__adapter_unittest.dart` that imports these files.
-      {pattern: 'modules/*/test/**/*_spec.js', included: true},
+      // TODO(tbosch): include the other tests as well and adjust their import
+      // {pattern: 'modules/*/test/**/*_spec.js', included: true},
+      {pattern: 'modules/*/test/**/compiler/integration_spec.js', included: true},
       {pattern: 'tools/transpiler/spec/**/*_spec.js', included: true},
 
       // These files are not included, they are imported by the unit tests above.
@@ -28,31 +30,31 @@ module.exports = function(config) {
       guinness: 'package:guinness/guinness_html.dart'
     },
 
-    // TODO(vojta): Remove the localhost:9877 from urls, once the proxy fix is merged:
+    // TODO(vojta): Remove the localhost:9870 from urls, once the proxy fix is merged:
     // https://github.com/karma-runner/karma/pull/1207
     //
     // Map packages to the correct urls where Karma serves them.
     proxies: {
       // Dependencies installed with `pub install`.
-      '/packages/unittest': 'http://localhost:9877/base/packages/unittest',
-      '/packages/guinness': 'http://localhost:9877/base/packages/guinness',
-      '/packages/matcher': 'http://localhost:9877/base/packages/matcher',
-      '/packages/stack_trace': 'http://localhost:9877/base/packages/stack_trace',
-      '/packages/collection': 'http://localhost:9877/base/packages/collection',
-      '/packages/path': 'http://localhost:9877/base/packages/path',
+      '/packages/unittest': 'http://localhost:9870/base/packages/unittest',
+      '/packages/guinness': 'http://localhost:9870/base/packages/guinness',
+      '/packages/matcher': 'http://localhost:9870/base/packages/matcher',
+      '/packages/stack_trace': 'http://localhost:9870/base/packages/stack_trace',
+      '/packages/collection': 'http://localhost:9870/base/packages/collection',
+      '/packages/path': 'http://localhost:9870/base/packages/path',
 
       // Local dependencies, transpiled from the source.
-      '/packages/angular': 'http://localhost:9877/base/modules/angular',
-      '/packages/benchpress': 'http://localhost:9877/base/modules/benchpress',
-      '/packages/core': 'http://localhost:9877/base/modules/core',
-      '/packages/change_detection': 'http://localhost:9877/base/modules/change_detection',
-      '/packages/reflection': 'http://localhost:9877/base/modules/reflection',
-      '/packages/di': 'http://localhost:9877/base/modules/di',
-      '/packages/directives': 'http://localhost:9877/base/modules/directives',
-      '/packages/facade': 'http://localhost:9877/base/modules/facade',
-      '/packages/forms': 'http://localhost:9877/base/modules/forms',
-      '/packages/test_lib': 'http://localhost:9877/base/modules/test_lib',
-      '/packages/mock': 'http://localhost:9877/base/modules/mock',
+      '/packages/angular': 'http://localhost:9870/base/modules/angular',
+      '/packages/benchpress': 'http://localhost:9870/base/modules/benchpress',
+      '/packages/core': 'http://localhost:9870/base/modules/core',
+      '/packages/change_detection': 'http://localhost:9870/base/modules/change_detection',
+      '/packages/reflection': 'http://localhost:9870/base/modules/reflection',
+      '/packages/di': 'http://localhost:9870/base/modules/di',
+      '/packages/directives': 'http://localhost:9870/base/modules/directives',
+      '/packages/facade': 'http://localhost:9870/base/modules/facade',
+      '/packages/forms': 'http://localhost:9870/base/modules/forms',
+      '/packages/test_lib': 'http://localhost:9870/base/modules/test_lib',
+      '/packages/mock': 'http://localhost:9870/base/modules/mock',
     },
 
     preprocessors: {
@@ -85,7 +87,7 @@ module.exports = function(config) {
     },
     browsers: ['DartiumWithWebPlatform'],
 
-    port: 9877
+    port: 9870
   });
 
 

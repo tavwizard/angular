@@ -10,13 +10,11 @@ import {DirectiveMetadata} from './directive_metadata';
 import {SetterFn} from 'angular2/src/reflection/types';
 import {IMPLEMENTS, int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
 import {Injector} from 'angular2/di';
-import {NgElement} from 'angular2/src/render/ng_element';
+import {NgElement} from './ng_element';
 import {ViewContainer} from './view_container';
-import {EventManager} from 'angular2/src/render/events/event_manager';
+import {ProtoView, DirectiveBindingMemento, ElementBindingMemento, DirectiveMemento} from './proto_view';
 
-import {ProtoRenderView, RenderView} from 'angular2/src/render/render_view';
-import {RenderViewContainer} from 'angular2/src/render/render_view_container';
-import {RenderElementBinder} from 'angular2/src/render/render_element_binder';
+import * as renderApi from 'angular2/render_api';
 
 /**
  * Const of making objects: http://jsperf.com/instantiate-size-of-object
@@ -34,9 +32,9 @@ export class View {
   proto: ProtoView;
   context: any;
   locals:Locals;
-  render:RenderView;
+  render:renderApi.View;
 
-  constructor(renderView:RenderView, proto:ProtoView, protoLocals:Map) {
+  constructor(renderView:renderApi.View, proto:ProtoView, protoLocals:Map) {
     this.render = renderView;
     this.proto = proto;
     this.changeDetector = null;
@@ -136,7 +134,9 @@ export class View {
       // elementInjectors
       var elementInjector = this.elementInjectors[i];
       if (isPresent(elementInjector)) {
-        elementInjector.instantiateDirectives(appInjector, shadowDomAppInjector, this.preBuiltObjects[i]);
+        elementInjector.instantiateDirectives(
+          appInjector, shadowDomAppInjector, hostElementInjector, this.preBuiltObjects[i]
+        );
 
         // The exporting of $implicit is a special case. Since multiple elements will all export
         // the different values as $implicit, directly assign $implicit bindings to the variable
@@ -248,250 +248,6 @@ export class View {
       StringMapWrapper.set(changes, record.bindingMemento._setterName, propertyUpdate);
     }
     return changes;
-  }
-}
-
-/**
- * @publicModule angular2/angular2
- */
-export class ProtoView {
-  elementBinders:List<ElementBinder>;
-  protoChangeDetector:ProtoChangeDetector;
-  variableBindings: Map;
-  protoLocals:Map;
-  // List<Map<eventName, handler>>, indexed by binder index
-  eventHandlers:List;
-  bindingRecords:List;
-  parentProtoView:ProtoView;
-  _variableBindings:List;
-  render:ProtoRenderView;
-
-  constructor(
-      protoRenderView: ProtoRenderView,
-      protoChangeDetector:ProtoChangeDetector,
-      elementBinders:List<ElementBinder>,
-      eventHandlers:List,
-      bindingRecords:List,
-      variableBindings:List,
-      protoLocals:Map) {
-    this.render = protoRenderView;
-    this.elementBinders = elementBinders;
-    this.variableBindings = MapWrapper.create();
-    this.protoLocals = protoLocals;
-    this.protoChangeDetector = protoChangeDetector;
-    this.eventHandlers = eventHandlers;
-    this.bindingRecords = bindingRecords;
-    this._variableBindings = variableBindings;
-    // Updated later so we can resolve the cyclic dependency:
-    // ProtoView.parent vs elementBinder.nestedProtoView
-    this.parentProtoView = null;
-  }
-
-  // this work should be done the constructor of ProtoView once we separate
-  // ProtoView and ProtoViewBuilder
-  getVariableBindings() {
-    if (isPresent(this._variableBindings)) {
-      return this._variableBindings;
-    }
-
-    this._variableBindings = isPresent(this.parentProtoView) ?
-      ListWrapper.clone(this.parentProtoView.getVariableBindings()) : [];
-
-    MapWrapper.forEach(this.protoLocals, (v, local) => {
-      ListWrapper.push(this._variableBindings, local);
-    });
-
-    return this._variableBindings;
-  }
-
-  /**
-   * Creates an event handler.
-   *
-   * @param {Map} eventMap Map directiveIndexes to expressions
-   * @param {int} injectorIdx
-   * @returns {Function}
-   */
-  static buildEventHandler(eventMap: Map, injectorIdx: int) {
-    var locals = MapWrapper.create();
-    return (event, view) => {
-      // Most of the time the event will be fired only when the view is in the live document.
-      // However, in a rare circumstance the view might get dehydrated, in between the event
-      // queuing up and firing.
-      if (view.hydrated()) {
-        MapWrapper.set(locals, '$event', event);
-        MapWrapper.forEach(eventMap, (expr, directiveIndex) => {
-          var context;
-          if (directiveIndex === -1) {
-            context = view.context;
-          } else {
-            context = view.elementInjectors[injectorIdx].getDirectiveAtIndex(directiveIndex);
-          }
-          expr.eval(context, new Locals(view.locals, locals));
-        });
-      }
-    }
-  }
-
-  // TODOz move to builder!
-  bindVariable(contextName:string, templateName:string) {
-    MapWrapper.set(this.variableBindings, contextName, templateName);
-    MapWrapper.set(this.protoLocals, templateName, null);
-  }
-
-  /**
-   * Adds an element property binding for the last created ElementBinder via bindElement
-   */
-  // TODOz move to builder!
-  bindElementProperty(expression:AST, setterName:string, setter:SetterFn) {
-    var elBinder = this.elementBinders[this.elementBinders.length-1];
-    var memento = new ElementBindingMemento(this.elementBinders.length-1, setterName, setter);
-    ListWrapper.push(this.bindingRecords, new BindingRecord(expression, memento, null));
-  }
-
-  /**
-   * Adds an event binding for the last created ElementBinder via bindElement.
-   *
-   * If the directive index is a positive integer, the event is evaluated in the context of
-   * the given directive.
-   *
-   * If the directive index is -1, the event is evaluated in the context of the enclosing view.
-   *
-   * @param {string} eventName
-   * @param {AST} expression
-   * @param {int} directiveIndex The directive index in the binder or -1 when the event is not bound
-   *                             to a directive
-   */
-  // TODOz move to builder!
-  bindEvent(eventName:string, expression:AST, directiveIndex: int = -1) {
-    var elBinder = this.elementBinders[this.elementBinders.length - 1];
-    var events = elBinder.events;
-    if (isBlank(events)) {
-      events = StringMapWrapper.create();
-      elBinder.events = events;
-    }
-    var event = StringMapWrapper.get(events, eventName);
-    if (isBlank(event)) {
-      event = MapWrapper.create();
-      StringMapWrapper.set(events, eventName, event);
-    }
-    MapWrapper.set(event, directiveIndex, expression);
-  }
-
-  /**
-   * Adds a directive property binding for the last created ElementBinder via bindElement
-   */
-  // TODOz move to builder!
-  bindDirectiveProperty(
-    directiveIndex:number,
-    expression:AST,
-    setterName:string,
-    setter:SetterFn) {
-
-    var bindingMemento = new DirectiveBindingMemento(
-      this.elementBinders.length-1,
-      directiveIndex,
-      setterName,
-      setter
-    );
-    var directiveMemento = DirectiveMemento.get(bindingMemento);
-    ListWrapper.push(this.bindingRecords, new BindingRecord(expression, bindingMemento, directiveMemento));
-  }
-
-  // Create a rootView as if the compiler encountered <rootcmp></rootcmp>,
-  // and the component template is already compiled into protoView.
-  // Used for bootstrapping.
-  static createRootProtoView(
-      rootProtoRenderView: ProtoRenderView,
-      protoView: ProtoView,
-      rootComponentAnnotatedType: DirectiveMetadata,
-      protoChangeDetector:ProtoChangeDetector
-  ): ProtoView {
-
-    var cmpType = rootComponentAnnotatedType.type;
-    var rootProtoView = new ProtoView(rootProtoRenderView, protoChangeDetector);
-    var binder = rootProtoView.bindElement(
-      new ProtoElementInjector(null, 0, [cmpType], true)
-    );
-    binder.componentDirective = rootComponentAnnotatedType;
-    binder.nestedProtoView = protoView;
-    return rootProtoView;
-  }
-}
-
-/**
- * @publicModule angular2/angular2
- */
-export class ElementBindingMemento {
-  _elementIndex:int;
-  _setterName:string;
-  _setter:SetterFn;
-  constructor(elementIndex:int, setterName:string, setter:SetterFn) {
-    this._elementIndex = elementIndex;
-    this._setterName = setterName;
-    this._setter = setter;
-  }
-
-  invoke(record:ChangeRecord, renderView:RenderView) {
-    renderView.setElementProperty(this._elementIndex, this._setterName, this._setter, record.currentValue);
-  }
-}
-
-/**
- * @publicModule angular2/angular2
- */
-export class DirectiveBindingMemento {
-  _elementInjectorIndex:int;
-  _directiveIndex:int;
-  _setterName:string;
-  _setter:SetterFn;
-  constructor(
-      elementInjectorIndex:number,
-      directiveIndex:number,
-      setterName:string,
-      setter:SetterFn) {
-    this._elementInjectorIndex = elementInjectorIndex;
-    this._directiveIndex = directiveIndex;
-    this._setterName = setterName;
-    this._setter = setter;
-  }
-
-  invoke(record:ChangeRecord, elementInjectors:List<ElementInjector>) {
-    var elementInjector:ElementInjector = elementInjectors[this._elementInjectorIndex];
-    var directive = elementInjector.getDirectiveAtIndex(this._directiveIndex);
-    this._setter(directive, record.currentValue);
-  }
-}
-
-var _directiveMementos = MapWrapper.create();
-
-class DirectiveMemento {
-  _elementInjectorIndex:number;
-  _directiveIndex:number;
-
-  constructor(elementInjectorIndex:number, directiveIndex:number) {
-    this._elementInjectorIndex = elementInjectorIndex;
-    this._directiveIndex = directiveIndex;
-  }
-
-  static get(memento:DirectiveBindingMemento) {
-    var elementInjectorIndex = memento._elementInjectorIndex;
-    var directiveIndex = memento._directiveIndex;
-    var id = elementInjectorIndex * 100 + directiveIndex;
-
-    if (!MapWrapper.contains(_directiveMementos, id)) {
-      MapWrapper.set(_directiveMementos, id, new DirectiveMemento(elementInjectorIndex, directiveIndex));
-    }
-    return MapWrapper.get(_directiveMementos, id);
-  }
-
-  directive(elementInjectors:List<ElementInjector>) {
-    var elementInjector:ElementInjector = elementInjectors[this._elementInjectorIndex];
-    return elementInjector.getDirectiveAtIndex(this._directiveIndex);
-  }
-
-  directiveBinding(elementInjectors:List<ElementInjector>) {
-    var elementInjector:ElementInjector = elementInjectors[this._elementInjectorIndex];
-    return elementInjector.getDirectiveBindingAtIndex(this._directiveIndex);
   }
 }
 

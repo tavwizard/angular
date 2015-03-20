@@ -6,9 +6,9 @@ export * from './src/core/application';
 
 export * from './src/core/compiler/compiler';
 
-export * from './src/core/compiler/template_loader';
 export * from './src/core/compiler/view';
+export * from './src/core/compiler/proto_view';
 export * from './src/core/compiler/view_container';
 export * from './src/core/compiler/binding_propagation_config';
 
-export * from './src/render/ng_element';
+export * from './src/core/compiler/ng_element';

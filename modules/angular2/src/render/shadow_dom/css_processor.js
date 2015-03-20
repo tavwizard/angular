@@ -3,12 +3,13 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {isPresent} from 'angular2/src/facade/lang';
 import {List} from 'angular2/src/facade/collection';
 
-import {CompileStep} from 'angular2/src/core/compiler/pipeline/compile_step';
-import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';
-import {CompileControl} from 'angular2/src/core/compiler/pipeline/compile_control';
+import {CompileStep} from '../compiler/compile_step';
+import {CompileElement} from '../compiler/compile_element';
+import {CompileControl} from '../compiler/compile_control';
 
 import {ShadowDomStrategy} from './shadow_dom_strategy';
-import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
+
+import {Template, DirectiveMetadata} from '../api';
 
 /**
  * Processes the <style> tags during the compilation:
@@ -25,13 +26,13 @@ export class CssProcessor {
   /**
    * Returns a compile step to be added to the compiler pipeline.
    *
-   * @param {DirectiveMetadata} cmpMetadata
+   * @param {Template} template
    * @param {ShadowDomStrategy} shadowDomStrategy
-   * @param {string} templateUrl The base URL of the template
+   * @param {List} stylePromises List of style promises to wait for
    */
-  getCompileStep(cmpMetadata: DirectiveMetadata, shadowDomStrategy: ShadowDomStrategy,
-    templateUrl: string) {
-    var strategyStep = shadowDomStrategy.getStyleCompileStep(cmpMetadata, templateUrl);
+  getCompileStep(template: Template, shadowDomStrategy: ShadowDomStrategy,
+    stylePromises: List<Promise>) {
+    var strategyStep = shadowDomStrategy.getStyleCompileStep(template, stylePromises);
     return new _CssProcessorStep(strategyStep, this._transformers);
   }
 }

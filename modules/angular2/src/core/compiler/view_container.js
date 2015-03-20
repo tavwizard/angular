@@ -4,8 +4,7 @@ import {BaseException} from 'angular2/src/facade/lang';
 import {Injector} from 'angular2/di';
 import * as eiModule from 'angular2/src/core/compiler/element_injector';
 import {isPresent, isBlank} from 'angular2/src/facade/lang';
-import {EventManager} from 'angular2/src/render/events/event_manager';
-import {RenderViewContainer} from 'angular2/src/render/render_view_container';
+import * as renderApi from 'angular2/render_api';
 import * as vfModule from './view_factory';
 
 /**
@@ -16,18 +15,16 @@ export class ViewContainer {
   parentView: viewModule.View;
   defaultProtoView: viewModule.ProtoView;
   _views: List<viewModule.View>;
-  _eventManager: EventManager;
   elementInjector: eiModule.ElementInjector;
   appInjector: Injector;
   hostElementInjector: eiModule.ElementInjector;
-  render: RenderViewContainer;
+  render: renderApi.ViewContainer;
 
   constructor(viewFactory: vfModule.ViewFactory,
-              renderViewContainer: RenderViewContainer,
+              renderViewContainer: renderApi.ViewContainer,
               parentView: viewModule.View,
               defaultProtoView: viewModule.ProtoView,
-              elementInjector: eiModule.ElementInjector,
-              eventManager: EventManager) {
+              elementInjector: eiModule.ElementInjector) {
     this._viewFactory = viewFactory;
     this.render = renderViewContainer;
     this.parentView = parentView;
@@ -38,7 +35,6 @@ export class ViewContainer {
     this._views = [];
     this.appInjector = null;
     this.hostElementInjector = null;
-    this._eventManager = eventManager;
   }
 
   hydrate(appInjector: Injector, hostElementInjector: eiModule.ElementInjector) {
@@ -49,11 +45,17 @@ export class ViewContainer {
   dehydrate() {
     this.appInjector = null;
     this.hostElementInjector = null;
-    this.clear();
+    // Note: Can't use this.clear here as we don't want to
+    // change the render side, only want to tell
+    // it that we don't need the render view any more!
+    for (var i = this._views.length - 1; i >= 0; i--) {
+      this._detach(i, false);
+      this._viewFactory.returnView(this._views[i]);
+    }
+    this._views = [];
   }
 
   clear() {
-    this.render.clear();
     for (var i = this._views.length - 1; i >= 0; i--) {
       this.remove(i);
     }
@@ -76,19 +78,8 @@ export class ViewContainer {
   create(atIndex=-1): viewModule.View {
     if (!this.hydrated()) throw new BaseException(
         'Cannot create views on a dehydrated ViewContainer');
-    var renderView = this.render.create(atIndex);
-
-    // TODO(rado): replace with viewFactory.
-    var newView = this._viewFactory.getView(renderView, defaultProtoView,
-      this.hostElementInjector, this._eventManager
-    );
-    // insertion must come before hydration so that element injector trees are attached.
+    var newView = this._viewFactory.getView(defaultProtoView);
     this._insert(newView, atIndex);
-
-    newView.hydrate(
-      this.appInjector, this.hostElementInjector,
-      this.parentView.context, this.parentView.locals
-    );
     return newView;
   }
 
@@ -99,6 +90,13 @@ export class ViewContainer {
     this.parentView.changeDetector.addChild(view.changeDetector);
     this._linkElementInjectors(view);
 
+    // insertion must come before hydration so that element injector trees are attached.
+    if (!view.hydrated()) {
+      view.hydrate(
+        this.appInjector, this.hostElementInjector,
+        this.parentView.context, this.parentView.locals
+      );
+    }
     return view;
   }
 
@@ -109,21 +107,21 @@ export class ViewContainer {
 
   remove(atIndex=-1) {
     if (atIndex == -1) atIndex = this._views.length - 1;
-    this.render.remove(atIndex);
 
-    var view = this._detach(atIndex);
-    view.dehydrate();
-    // TODO(rado): this needs to be delayed until after any pending animations.
+    var view = this.detach(atIndex);
     this._viewFactory.returnView(view);
     // view is intentionally not returned to the client.
   }
 
-  _detach(atIndex=-1): viewModule.View {
+  _detach(atIndex=-1, detachRender=true): viewModule.View {
     if (atIndex == -1) atIndex = this._views.length - 1;
     var detachedView = this.get(atIndex);
     ListWrapper.removeAt(this._views, atIndex);
     detachedView.changeDetector.remove();
     this._unlinkElementInjectors(detachedView);
+    if (detachRender) {
+      this.render.detach();
+    }
     return detachedView;
   }
 
@@ -132,7 +130,7 @@ export class ViewContainer {
    * moving the dom nodes while the directives in the view stay intact.
    */
   detach(atIndex=-1): viewModule.View {
-    return this._detach(atIndex);
+    return this._detach(atIndex, true);
   }
 
   _linkElementInjectors(view) {

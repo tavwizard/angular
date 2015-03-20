@@ -7,7 +7,7 @@ import {ProtoView} from './compiler/view';
 import {Reflector, reflector} from 'angular2/src/reflection/reflection';
 import {Parser, Lexer, ChangeDetection, dynamicChangeDetection, jitChangeDetection} from 'angular2/change_detection';
 import {ExceptionHandler} from './exception_handler';
-import {TemplateLoader} from './compiler/template_loader';
+import {TemplateLoader} from 'angular2/src/render/compiler/template_loader';
 import {TemplateResolver} from './compiler/template_resolver';
 import {DirectiveMetadataReader} from './compiler/directive_metadata_reader';
 import {List, ListWrapper} from 'angular2/src/facade/collection';
@@ -15,13 +15,13 @@ import {Promise, PromiseWrapper} from 'angular2/src/facade/async';
 import {VmTurnZone} from 'angular2/src/core/zone/vm_turn_zone';
 import {LifeCycle} from 'angular2/src/core/life_cycle/life_cycle';
 import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
-import {XHR} from 'angular2/src/core/compiler/xhr/xhr';
-import {XHRImpl} from 'angular2/src/core/compiler/xhr/xhr_impl';
+import {XHR} from 'angular2/src/services/xhr';
+import {XHRImpl} from 'angular2/src/services/xhr_impl';
 import {EventManager, DomEventsPlugin} from 'angular2/src/render/events/event_manager';
 import {HammerGesturesPlugin} from 'angular2/src/render/events/hammer_gestures';
 import {Binding} from 'angular2/src/di/binding';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
-import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
+import {UrlResolver} from 'angular2/src/services/url_resolver';
 import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
 import {StyleInliner} from 'angular2/src/render/shadow_dom/style_inliner';
 import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
@@ -60,23 +60,13 @@ function _injectorBindings(appComponentType): List<Binding> {
         return element;
       }, [appComponentAnnotatedTypeToken, appDocumentToken]),
 
-      bind(appViewToken).toAsyncFactory((changeDetection, compiler, injector, appElement,
-        appComponentAnnotatedType, strategy, eventManager, viewFactory) => {
+      bind(appViewToken).toAsyncFactory((compiler, injector, appElement,
+        appComponentAnnotatedType, viewFactory) => {
         return compiler.compile(appComponentAnnotatedType.type).then(
             (protoView) => {
-          var appProtoView = ProtoView.createRootProtoView(protoView, appElement,
-            appComponentAnnotatedType, changeDetection.createProtoChangeDetector('root'),
-            strategy);
-          // The light Dom of the app element is not considered part of
-          // the angular application. Thus the context and lightDomInjector are
-          // empty.
-          var appRenderView = null; // TODO(tbosch): fill this!
-          var view = viewFactory.getView(appProtoView, appRenderView, null, eventManager);
-          view.hydrate(injector, null, null, new Object(), null);
-          return view;
+          return viewFactory.getRootView(appElement, appComponentAnnotatedType.type, injector, protoView);
         });
-      }, [ChangeDetection, Compiler, Injector, appElementToken, appComponentAnnotatedTypeToken,
-          ShadowDomStrategy, EventManager, ViewFactory]),
+      }, [Compiler, Injector, appElementToken, appComponentAnnotatedTypeToken, ViewFactory]),
 
       bind(appChangeDetectorToken).toFactory((rootView) => rootView.changeDetector,
           [appViewToken]),

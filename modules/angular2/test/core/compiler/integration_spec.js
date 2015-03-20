@@ -24,11 +24,11 @@ import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_meta
 import {ShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
 import {PrivateComponentLocation} from 'angular2/src/core/compiler/private_component_location';
 import {PrivateComponentLoader} from 'angular2/src/core/compiler/private_component_loader';
-import {TemplateLoader} from 'angular2/src/core/compiler/template_loader';
+import {TemplateLoader} from 'angular2/src/render/compiler/template_loader';
 import {MockTemplateResolver} from 'angular2/src/mock/template_resolver_mock';
 import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
-import {UrlResolver} from 'angular2/src/core/compiler/url_resolver';
+import {UrlResolver} from 'angular2/src/services/url_resolver';
 import {StyleUrlResolver} from 'angular2/src/render/shadow_dom/style_url_resolver';
 import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
 import {EventManager} from 'angular2/src/render/events/event_manager';
@@ -43,52 +43,79 @@ import {If} from 'angular2/src/directives/if';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
 import {ViewFactory} from 'angular2/src/core/compiler/view_factory';
 
+import {DirectRenderer} from 'angular2/src/render/direct_renderer';
+import * as renderCompilerModule from 'angular2/src/render/compiler/compiler';
+import * as renderViewFactoryModule from 'angular2/src/render/view/view_factory';
+
 export function main() {
   ddescribe('integration tests', function() {
-    var directiveMetadataReader, shadowDomStrategy, compiler, tplResolver, viewFactory;
+    var directiveMetadataReader, shadowDomStrategy, compiler, tplResolver, viewFactory, urlResolver, renderer,
+        parser;
 
-    function createCompiler(tplResolver, changedDetection) {
-      var urlResolver = new UrlResolver();
-      return new Compiler(changedDetection,
-        new TemplateLoader(null, null),
+    function createCompiler(tplResolver, changeDetection) {
+
+      return new Compiler(
         directiveMetadataReader,
-        new Parser(new Lexer()),
         new CompilerCache(),
-        shadowDomStrategy,
         tplResolver,
         new ComponentUrlMapper(),
         urlResolver,
-        new CssProcessor(null)
+        renderer,
+        parser,
+        changeDetection
       );
     }
 
     beforeEach( () => {
+      parser = new Parser(new Lexer());
+      shadowDomStrategy = new EmulatedUnscopedShadowDomStrategy(new StyleUrlResolver(urlResolver), null);
+      var renderCompiler = new renderCompilerModule.Compiler(
+        new TemplateLoader(null, null),
+        parser,
+        shadowDomStrategy,
+        new CssProcessor(null)
+      );
+
+      var eventManager = null;
+      var renderViewFactory = new renderViewFactoryModule.ViewFactory(
+        1,
+        eventManager,
+        shadowDomStrategy
+      );
+
+      renderer = new DirectRenderer(
+        renderCompiler,
+        eventManager,
+        shadowDomStrategy,
+        renderViewFactory
+      );
+
       tplResolver = new MockTemplateResolver();
 
       directiveMetadataReader = new DirectiveMetadataReader();
 
-      var urlResolver = new UrlResolver();
-      shadowDomStrategy = new EmulatedUnscopedShadowDomStrategy(new StyleUrlResolver(urlResolver), null);
+      urlResolver = new UrlResolver();
 
       compiler = createCompiler(tplResolver, dynamicChangeDetection);
-      viewFactory = new ViewFactory(0);
+      viewFactory = new ViewFactory(0, renderer, dynamicChangeDetection, directiveMetadataReader);
     });
 
     describe('react to record changes', function() {
-      var view, ctx, cd;
+      var view, ctx, cd, rootElement;
       function createView(pv) {
+        rootElement = el('<div></div>');
         ctx = new MyComp();
-        view = viewFactory.getView(viewFactory.render.getView(pv.render, null), pv, null, null);
-        view.render.hydrate(null);
-        view.hydrate(new Injector([
+        var injector = new Injector([
           bind(Compiler).toValue(compiler),
           bind(DirectiveMetadataReader).toValue(directiveMetadataReader),
           bind(ShadowDomStrategy).toValue(shadowDomStrategy),
           bind(EventManager).toValue(null),
           PrivateComponentLoader
-        ]), null, ctx, null);
-
-        cd = view.changeDetector;
+        ]);
+        var rootView = viewFactory.getRootView(rootElement, MyComp, injector, pv);
+        ctx = rootView.rootElementInjectors[0].get(MyComp);
+        cd = rootView.changeDetector;
+        view = rootView.componentChildViews[0];
       }
 
       iit('should consume text node changes', inject([AsyncTestCompleter], (async) => {

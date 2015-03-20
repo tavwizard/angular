@@ -2,23 +2,18 @@ import {Type, isBlank, isPresent, BaseException, normalizeBlank, stringify} from
 import {Promise, PromiseWrapper} from 'angular2/src/facade/async';
 import {List, ListWrapper, Map, MapWrapper} from 'angular2/src/facade/collection';
 
-import {ChangeDetection, Parser} from 'angular2/change_detection';
-
 import {DirectiveMetadataReader} from './directive_metadata_reader';
-import {ProtoView} from './view';
+import {ProtoView} from './proto_view';
 import {ElementBinder} from './element_binder';
-import {CompilePipeline} from './pipeline/compile_pipeline';
-import {CompileElement} from './pipeline/compile_element';
-import {createDefaultSteps} from './pipeline/default_steps';
-import {TemplateLoader} from './template_loader';
 import {TemplateResolver} from './template_resolver';
 import {Component} from '../annotations/annotations';
 import {Template} from '../annotations/template';
-import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
-import {CompileStep} from './pipeline/compile_step';
 import {ComponentUrlMapper} from './component_url_mapper';
-import {UrlResolver} from './url_resolver';
-import {CssProcessor} from 'angular2/src/render/shadow_dom/css_processor';
+import {UrlResolver} from 'angular2/src/services/url_resolver';
+import {ProtoViewBuilder} from './proto_view_builder';
+import {ChangeDetection, Parser} from 'angular2/change_detection';
+
+import * as renderApi from 'angular2/render_api';
 
 /**
  * Cache that stores the ProtoView of the template of a component.
@@ -53,57 +48,44 @@ export class CompilerCache {
  */
 export class Compiler {
   _reader: DirectiveMetadataReader;
-  _parser:Parser;
   _compilerCache:CompilerCache;
-  _changeDetection:ChangeDetection;
-  _templateLoader:TemplateLoader;
   _compiling:Map<Type, Promise>;
-  _shadowDomStrategy: ShadowDomStrategy;
   _templateResolver: TemplateResolver;
   _componentUrlMapper: ComponentUrlMapper;
   _urlResolver: UrlResolver;
   _appUrl: string;
-  _cssProcessor: CssProcessor;
+  _renderer: renderApi.Renderer;
+  _changeDetection: ChangeDetection;
+  _parser: Parser;
 
-  constructor(changeDetection:ChangeDetection,
-              templateLoader:TemplateLoader,
-              reader: DirectiveMetadataReader,
-              parser:Parser,
+  constructor(reader: DirectiveMetadataReader,
               cache:CompilerCache,
-              shadowDomStrategy: ShadowDomStrategy,
               templateResolver: TemplateResolver,
               componentUrlMapper: ComponentUrlMapper,
               urlResolver: UrlResolver,
-              cssProcessor: CssProcessor) {
-    this._changeDetection = changeDetection;
+              renderer: renderApi.Renderer,
+              parser: Parser,
+              changeDetection: ChangeDetection) {
     this._reader = reader;
-    this._parser = parser;
     this._compilerCache = cache;
-    this._templateLoader = templateLoader;
     this._compiling = MapWrapper.create();
-    this._shadowDomStrategy = shadowDomStrategy;
     this._templateResolver = templateResolver;
     this._componentUrlMapper = componentUrlMapper;
     this._urlResolver = urlResolver;
     this._appUrl = urlResolver.resolve(null, './');
-    this._cssProcessor = cssProcessor;
-  }
-
-  createSteps(component:Type, template: Template):List<CompileStep> {
-    var dirMetadata = ListWrapper.map(this._flattenDirectives(template),
-      (d) => this._reader.read(d));
-
-    var cmpMetadata = this._reader.read(component);
-
-    var templateUrl = this._templateLoader.getTemplateUrl(template);
-
-    return createDefaultSteps(this._parser, cmpMetadata, dirMetadata,
-      this._shadowDomStrategy, templateUrl, this._cssProcessor);
+    this._renderer = renderer;
+    this._parser = parser;
+    this._changeDetection = changeDetection;
   }
 
   compile(component: Type):Promise<ProtoView> {
-    var protoView = this._compile(component);
-    return PromiseWrapper.isPromise(protoView) ? protoView : PromiseWrapper.resolve(protoView);
+    // TODOz uncomment try/catch again
+    // try {
+      var protoView = this._compile(component);
+      return PromiseWrapper.isPromise(protoView) ? protoView : PromiseWrapper.resolve(protoView);
+    // } catch (ex) {
+    //   return PromiseWrapper.reject(ex);
+    // }
   }
 
   // TODO(vicb): union type return ProtoView or Promise<ProtoView>
@@ -125,77 +107,70 @@ export class Compiler {
 
     var template = this._templateResolver.resolve(component);
 
-    var componentUrl = this._componentUrlMapper.getUrl(component);
-    var baseUrl = this._urlResolver.resolve(this._appUrl, componentUrl);
-    this._templateLoader.setBaseUrl(template, baseUrl);
-
-    var tplElement = this._templateLoader.load(template);
-
-    if (PromiseWrapper.isPromise(tplElement)) {
-      pvPromise = PromiseWrapper.then(tplElement,
-        (el) => this._compileTemplate(template, el, component),
-        (_) => { throw new BaseException(`Failed to load the template for ${stringify(component)}`); }
-      );
+    protoView = this._compileTemplate(template, component);
+    if (PromiseWrapper.isPromise(protoView)) {
+      pvPromise = protoView.then( (pv) => {
+        MapWrapper.delete(this._compiling, component, pvPromise);
+        return pv;
+      });
       MapWrapper.set(this._compiling, component, pvPromise);
       return pvPromise;
+    } else {
+      return protoView;
     }
-
-    return this._compileTemplate(template, tplElement, component);
   }
 
-  // TODO(vicb): union type return ProtoView or Promise<ProtoView>
-  _compileTemplate(template: Template, tplElement, component: Type) {
-    var pipeline = new CompilePipeline(this.createSteps(component, template));
-    var compileElements;
+  _compileTemplate(template: Template, component: Type) {
+    var componentUrl = this._componentUrlMapper.getUrl(component);
+    var baseUrl = this._urlResolver.resolve(this._appUrl, componentUrl);
+    var templateAbsUrl = null;
+    if (isPresent(template.url)) {
+      templateAbsUrl = this._urlResolver.resolve(baseUrl, template.url);
+    }
 
-    // TODOz uncomment try/catch again
-    // try {
-      compileElements = pipeline.process(tplElement, stringify(component));
-    // } catch(ex) {
-    //   return PromiseWrapper.reject(ex);
-    // }
+    var renderTemplate = new renderApi.Template({
+      id: stringify(component),
+      absUrl: templateAbsUrl,
+      inline: template.inline,
+      directives: ListWrapper.map(
+        this._flattenDirectives(template),
+        (d) => this._reader.read(d)
+      )
+    });
 
-    // TODOz: We might have to add more parameters here...
-    var protoView = compileElements[0].inheritedProtoView.build(this._changeDetection, this._shadowDomStrategy);
+    var renderProtoView = this._renderer.compile(renderTemplate);
+    if (PromiseWrapper.isPromise(renderProtoView)) {
+      return renderProtoView.then( (rpv) => this._createProtoView(rpv, component) );
+    } else {
+      return this._createProtoView(renderProtoView, component);
+    }
+  }
 
-    // Populate the cache before compiling the nested components,
-    // so that components can reference themselves in their template.
-    this._compilerCache.set(component, protoView);
-    MapWrapper.delete(this._compiling, component);
+  _createProtoView(renderProtoView: renderApi.ProtoView, component: Type) {
+    var protoView = new ProtoViewBuilder(this._changeDetection, this._parser).init(renderProtoView).build();
+    if (PromiseWrapper.isPromise(protoView)) {
+      return protoView.then( (pv) => this._compileNestedProtoViews(pv) );
+    } else {
+      return this._compileNestedProtoViews(protoView);
+    }
+  }
 
+  _compileNestedProtoViews(protoView:ProtoView) {
     // Compile all the components from the template
     var nestedPVPromises = [];
-    this._compileNestedProtoViews(protoView, nestedPVPromises);
-
-    if (protoView.render.stylePromises.length > 0) {
-      // The protoView is ready after all asynchronous styles are ready
-      var syncProtoView = protoView;
-      protoView = PromiseWrapper.all(syncProtoView.render.stylePromises).then((_) => syncProtoView);
+    for (var i = 0; i < protoView.elementBinders.length; i++) {
+      var eb = protoView.elementBinders[i];
+      if (isPresent(eb.componentDirective) && !(eb.componentDirective.annotation instanceof DynamicComponent)) {
+        this._compileNestedProtoView(eb, nestedPVPromises);
+      }
     }
 
     if (nestedPVPromises.length > 0) {
       // Returns ProtoView Promise when there are any asynchronous nested ProtoViews.
       // The promise will resolved after nested ProtoViews are compiled.
-      return PromiseWrapper.then(PromiseWrapper.all(nestedPVPromises),
-        (_) => protoView,
-        (e) => { throw new BaseException(`${e} -> Failed to compile ${stringify(component)}`); }
-      );
-    }
-
-    return protoView;
-  }
-
-  _compileNestedProtoViews(protoView: ProtoView, promises: List<Promise>) {
-    for (var i=0; i<protoView.elementBinders.length; i++) {
-      var eb = protoView.elementBinders[i];
-      // TODOz: Maybe store a flag in the ElementBinder for this so we don't
-      // have to do instanceof check here?
-      // Ignore DyanmicComponents...
-      if (isPresent(eb.componentDirective) && eb.componentDirective.annotation instanceof Component) {
-        this._compileNestedProtoView(eb, promises);
-      } else if (isPresent(eb.viewportDirective)) {
-        this._compileNestedProtoViews(eb.nestedProtoView, promises);
-      }
+      return PromiseWrapper.all(nestedPVPromises);
+    } else {
+      return protoView;
     }
   }
 

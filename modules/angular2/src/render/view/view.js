@@ -1,21 +1,23 @@
+import * as api from '../api';
+
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {Promise} from 'angular2/src/facade/async';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
+import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
 
-import {RenderElementBinder} from './render_element_binder';
-import {RenderViewContainer} from './render_view_container';
-import {IMPLEMENTS, int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
-import {LightDom} from './shadow_dom/emulation/light_dom';
-import {Content} from './shadow_dom/emulation/content_tag';
-import {ShadowDomStrategy} from './shadow_dom/shadow_dom_strategy';
-import {EventManager} from 'angular2/src/render/events/event_manager';
+import {ViewContainer} from './view_container';
+import {ProtoView} from './proto_view';
+import {LightDom} from '../shadow_dom/emulation/light_dom';
+import {Content} from '../shadow_dom/emulation/content_tag';
+import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
+import {EventManager} from '../events/event_manager';
 
 const NG_BINDING_CLASS = 'ng-binding';
 
 /**
  * Const of making objects: http://jsperf.com/instantiate-size-of-object
  */
-export class RenderView {
+export class View extends api.View {
   boundElements:List;
   boundTextNodes:List;
   /// When the view is part of render tree, the DocumentFragment is empty, which is why we need
@@ -23,16 +25,18 @@ export class RenderView {
   rootNodes:List;
   // TODO(tbosch): move componentChildViews, viewContainers, contentTags, lightDoms into
   // a single array with records inside
-  componentChildViews: List<RenderView>;
-  viewContainers: List<RenderViewContainer>;
+  componentChildViews: List<View>;
+  viewContainers: List<ViewContainer>;
   contentTags: List<Content>;
   lightDoms: List<LightDom>;
-  proto: ProtoRenderView;
-  eventManager: EventManager;
+  proto: ProtoView;
+  _eventManager: EventManager;
+  _shadowDomStrategy:ShadowDomStrategy;
   _hydrated: boolean;
 
   constructor(
-      proto:ProtoRenderView, rootNodes:List, eventManager:EventManager,
+      proto:ProtoView, rootNodes:List, eventManager:EventManager,
+      shadowDomStrategy:ShadowDomStrategy,
       boundTextNodes: List, boundElements:List, viewContainers:List, contentTags:List) {
     this.proto = proto;
     this.rootNodes = rootNodes;
@@ -42,8 +46,13 @@ export class RenderView {
     this.contentTags = contentTags;
     this.lightDoms = ListWrapper.createFixedSize(boundElements.length);
     this.componentChildViews = ListWrapper.createFixedSize(boundElements.length);
-    this.eventManager = eventManager;
+    this._eventManager = eventManager;
     this._hydrated = false;
+    this._shadowDomStrategy = shadowDomStrategy;
+  }
+
+  hydrated() {
+    return this._hydrated;
   }
 
   // TODO: don't use the setter
@@ -56,24 +65,30 @@ export class RenderView {
   }
 
   listen(elementIndex:number, eventName:string, callback:Function) {
-    eventManager(this.boundElements[elementIndex], eventName, callback);
+    this._eventManager(this.boundElements[elementIndex], eventName, callback);
   }
 
-  setComponentView(elementIndex:number, childView:RenderView) {
+  setComponentView(elementIndex:number, childView:View) {
     var element = this.boundElements[elementIndex];
-    var strategy = this.proto.shadowDomStrategy;
 
-    var lightDom = strategy.constructLightDom(this, childView, element);
-    strategy.attachTemplate(element, childView);
+    var lightDom = this._shadowDomStrategy.constructLightDom(this, childView, element);
+    this._shadowDomStrategy.attachTemplate(element, childView);
     this.lightDoms[elementIndex] = lightDom;
     this.componentChildViews[elementIndex] = childView;
+    if (this._hydrated) {
+      childView.hydrate(lightDom);
+    }
+  }
+
+  getViewContainer(index:number):ViewContainer {
+    return this.viewcontainers[index];
   }
 
   _getDestLightDom(binderIndex) {
     var binder = this.proto.elementBinders[binderIndex];
     var destLightDom = null;
-    if (isPresent(binder.parent) && binder.distanceToParent === 1) {
-      destLightDom = this.lightDoms[binder.parent.index];
+    if (binder.parentIndex !== -1 && binder.distanceToParent === 1) {
+      destLightDom = this.lightDoms[binder.parentIndex];
     }
     return destLightDom;
   }
@@ -144,48 +159,5 @@ export class RenderView {
       }
     }
     this._hydrated = false;
-  }
-}
-
-export class ProtoRenderView {
-  element;
-  elementBinders:List<RenderElementBinder>;
-  instantiateInPlace:boolean;
-  rootBindingOffset:int;
-  isTemplateElement:boolean;
-  shadowDomStrategy: ShadowDomStrategy;
-  stylePromises: List<Promise>;
-
-  constructor(
-      template,
-      shadowDomStrategy:ShadowDomStrategy,
-      elementBinders:List<RenderElementBinder>) {
-    this.element = template;
-    this.elementBinders = elementBinders;
-    this.instantiateInPlace = false;
-    this.rootBindingOffset = (isPresent(this.element) && DOM.hasClass(this.element, NG_BINDING_CLASS))
-      ? 1 : 0;
-    this.isTemplateElement = DOM.isTemplateElement(this.element);
-    this.shadowDomStrategy = shadowDomStrategy;
-    // TODO(tbosch): We should keep this state somewhere else...
-    this.stylePromises = [];
-  }
-
-  // Create a rootView as if the compiler encountered <rootcmp></rootcmp>,
-  // and the component template is already compiled into protoView.
-  // Used for bootstrapping.
-  static createRootRenderProtoView(protoView: ProtoView,
-      insertionElement,
-      rootComponentAnnotatedType: DirectiveMetadata,
-      shadowDomStrategy: ShadowDomStrategy
-  ): ProtoView {
-
-    DOM.addClass(insertionElement, NG_BINDING_CLASS);
-    var cmpType = rootComponentAnnotatedType.type;
-    var rootProtoView = new ProtoRenderView(insertionElement, shadowDomStrategy);
-    rootProtoView.instantiateInPlace = true;
-    var binder = rootProtoView.bindElement(null, 0);
-    shadowDomStrategy.shimAppElement(rootComponentAnnotatedType, insertionElement);
-    return rootProtoView;
   }
 }

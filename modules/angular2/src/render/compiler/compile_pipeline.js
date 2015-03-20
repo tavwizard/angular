@@ -39,7 +39,7 @@ export class CompilePipeline {
 
     if (isPresent(additionalChildren)) {
       for (var i=0; i<additionalChildren.length; i++) {
-        this._process(results, current, additionalChildren[i]);
+        this._process(results, depth+1, current, additionalChildren[i]);
       }
     }
   }

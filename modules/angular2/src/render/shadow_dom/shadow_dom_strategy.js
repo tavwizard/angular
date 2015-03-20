@@ -1,10 +1,10 @@
-import {Type, isBlank, isPresent, int, StringWrapper, assertionsEnabled} from 'angular2/src/facade/lang';
+import {isBlank, isPresent, int, StringWrapper, assertionsEnabled} from 'angular2/src/facade/lang';
 import {List, ListWrapper, MapWrapper, Map} from 'angular2/src/facade/collection';
 import {PromiseWrapper} from 'angular2/src/facade/async';
 
 import {DOM} from 'angular2/src/dom/dom_adapter';
 
-import * as viewModule from '../render_view';
+import * as viewModule from '../view/view';
 
 import {LightDom} from './emulation/light_dom';
 import {ShadowCss} from './emulation/shadow_css';
@@ -12,11 +12,11 @@ import {ShadowCss} from './emulation/shadow_css';
 import {StyleInliner} from './style_inliner';
 import {StyleUrlResolver} from './style_url_resolver';
 
-import {DirectiveMetadata} from 'angular2/src/core/compiler/directive_metadata';
+import * as NS from '../compiler/compile_step';
+import {CompileElement} from '../compiler/compile_element';
+import {CompileControl} from '../compiler/compile_control';
 
-import * as NS from 'angular2/src/core/compiler/pipeline/compile_step';
-import {CompileElement} from 'angular2/src/core/compiler/pipeline/compile_element';
-import {CompileControl} from 'angular2/src/core/compiler/pipeline/compile_control';
+import {Template} from '../api';
 
 var _EMPTY_STEP;
 
@@ -30,17 +30,16 @@ function _emptyStep() {
 }
 
 export class ShadowDomStrategy {
-  attachTemplate(el, view:viewModule.RenderView) {}
-  constructLightDom(lightDomView:viewModule.RenderView, shadowDomView:viewModule.RenderView, el): LightDom { return null; }
+  attachTemplate(el, view:viewModule.View) {}
+  constructLightDom(lightDomView:viewModule.View, shadowDomView:viewModule.View, el): LightDom { return null; }
 
   /**
    * An optional step that can modify the template style elements.
    *
-   * @param {DirectiveMetadata} cmpMetadata
-   * @param {string} templateUrl the template base URL
+   * @param {Template} template
    * @returns {CompileStep} a compile step to append to the compiler pipeline
    */
-  getStyleCompileStep(cmpMetadata: DirectiveMetadata, templateUrl: string): NS.CompileStep {
+  getStyleCompileStep(template: Template, stylePromises: List<Promise>): NS.CompileStep {
     return _emptyStep();
   }
 
@@ -49,10 +48,10 @@ export class ShadowDomStrategy {
    *
    * This step could be used to modify the template in order to scope the styles.
    *
-   * @param {DirectiveMetadata} cmpMetadata
+   * @param {Template} template
    * @returns {CompileStep} a compile step to append to the compiler pipeline
    */
-  getTemplateCompileStep(cmpMetadata: DirectiveMetadata): NS.CompileStep { return _emptyStep(); }
+  getTemplateCompileStep(template: Template): NS.CompileStep { return _emptyStep(); }
 
   /**
    * The application element does not go through the compiler pipeline.
@@ -60,12 +59,11 @@ export class ShadowDomStrategy {
    * This methods is called when the root ProtoView is created and to optionnaly update the
    * application root element.
    *
-   * @see ProtoView.createRootProtoView
+   * @see ViewFactory.createRootView
    *
-   * @param {DirectiveMetadata} cmpMetadata
    * @param element
    */
-  shimAppElement(cmpMetadata: DirectiveMetadata, element) {}
+  shimAppElement(element) {}
 }
 
 /**
@@ -87,21 +85,21 @@ export class EmulatedUnscopedShadowDomStrategy extends ShadowDomStrategy {
     this._styleHost = styleHost;
   }
 
-  attachTemplate(el, view:viewModule.RenderView) {
+  attachTemplate(el, view:viewModule.View) {
     DOM.clearNodes(el);
     _moveViewNodesIntoParent(el, view);
   }
 
-  constructLightDom(lightDomView:viewModule.RenderView, shadowDomView:viewModule.RenderView, el): LightDom {
+  constructLightDom(lightDomView:viewModule.View, shadowDomView:viewModule.View, el): LightDom {
     return new LightDom(lightDomView, shadowDomView, el);
   }
 
-  getStyleCompileStep(cmpMetadata: DirectiveMetadata, templateUrl: string): NS.CompileStep {
-    return new _EmulatedUnscopedCssStep(cmpMetadata, templateUrl, this._styleUrlResolver,
-      this._styleHost);
+  getStyleCompileStep(template: Template, stylePromises: List<Promise>): NS.CompileStep {
+    return new _EmulatedUnscopedCssStep(template, this._styleUrlResolver,
+      this._styleHost, stylePromises);
   }
 
-  getTemplateCompileStep(cmpMetadata: DirectiveMetadata): NS.CompileStep {
+  getTemplateCompileStep(template: Template): NS.CompileStep {
     return new _BaseEmulatedShadowDomStep();
   }
 }
@@ -126,18 +124,17 @@ export class EmulatedScopedShadowDomStrategy extends EmulatedUnscopedShadowDomSt
     this._styleInliner = styleInliner;
   }
 
-  getStyleCompileStep(cmpMetadata: DirectiveMetadata, templateUrl: string): NS.CompileStep {
-    return new _EmulatedScopedCssStep(cmpMetadata, templateUrl, this._styleInliner,
-      this._styleUrlResolver, this._styleHost);
+  getStyleCompileStep(template: Template, stylePromises: List<Promise>): NS.CompileStep {
+    return new _EmulatedScopedCssStep(template, this._styleInliner,
+      this._styleUrlResolver, this._styleHost, stylePromises);
   }
 
-  getTemplateCompileStep(cmpMetadata: DirectiveMetadata): NS.CompileStep {
-    return new _ShimShadowDomStep(cmpMetadata);
+  getTemplateCompileStep(template: Template): NS.CompileStep {
+    return new _ShimShadowDomStep(template);
   }
 
-  shimAppElement(cmpMetadata: DirectiveMetadata, element) {
-    var cmpType = cmpMetadata.type;
-    var hostAttribute = _getHostAttribute(_getComponentId(cmpType));
+  shimAppElement(element) {
+    var hostAttribute = _getHostAttribute(_createAppId());
     DOM.setAttribute(element, hostAttribute, '');
   }
 }
@@ -156,12 +153,12 @@ export class NativeShadowDomStrategy extends ShadowDomStrategy {
     this._styleUrlResolver = styleUrlResolver;
   }
 
-  attachTemplate(el, view:viewModule.RenderView){
+  attachTemplate(el, view:viewModule.View){
     _moveViewNodesIntoParent(DOM.createShadowRoot(el), view);
   }
 
-  getStyleCompileStep(cmpMetadata: DirectiveMetadata, templateUrl: string): NS.CompileStep {
-    return new _NativeCssStep(templateUrl, this._styleUrlResolver);
+  getStyleCompileStep(template: Template, stylePromises: List<Promise>): NS.CompileStep {
+    return new _NativeCssStep(template.absUrl, this._styleUrlResolver);
   }
 }
 
@@ -174,11 +171,12 @@ class _BaseEmulatedShadowDomStep extends NS.CompileStep {
     if (StringWrapper.equals(nodeName.toUpperCase(), 'CONTENT')) {
       var attrs = current.attrs();
       var selector = MapWrapper.get(attrs, 'select');
-      current.contentTagSelector = isPresent(selector) ? selector : '';
+      selector = isPresent(selector) ? selector : '';
+      current.bindElement().setContentTagSelector(selector);
 
       var contentStart = DOM.createScriptTag('type', 'ng/contentStart');
       if (assertionsEnabled()) {
-        DOM.setAttribute(contentStart, 'select', current.contentTagSelector);
+        DOM.setAttribute(contentStart, 'select', selector);
       }
       var contentEnd = DOM.createScriptTag('type', 'ng/contentEnd');
       DOM.insertBefore(current.element, contentStart);
@@ -200,9 +198,9 @@ class _EmptyCompileStep extends NS.CompileStep {
 class _ShimShadowDomStep extends _BaseEmulatedShadowDomStep {
   _contentAttribute: string;
 
-  constructor(cmpMetadata: DirectiveMetadata) {
+  constructor(template: Template) {
     super();
-    var id = _getComponentId(cmpMetadata.type);
+    var id = _getComponentId(template);
     this._contentAttribute = _getContentAttribute(id);
   }
 
@@ -217,9 +215,9 @@ class _ShimShadowDomStep extends _BaseEmulatedShadowDomStep {
     DOM.setAttribute(current.element, this._contentAttribute, '');
 
     // If the current element is also a component, shim it as a host
-    var host = current.componentDirective;
+    var host = current.injeritedElementBinder.isComponentDirective();
     if (isPresent(host)) {
-      var hostId = _getComponentId(host.type);
+      var hostId = _getComponentId(template);
       var hostAttribute = _getHostAttribute(hostId);
       DOM.setAttribute(current.element, hostAttribute, '');
     }
@@ -231,10 +229,9 @@ class _EmulatedUnscopedCssStep extends NS.CompileStep {
   _styleUrlResolver: StyleUrlResolver;
   _styleHost;
 
-  constructor(cmpMetadata: DirectiveMetadata, templateUrl: string,
-    styleUrlResolver: StyleUrlResolver, styleHost) {
+  constructor(template: Template, styleUrlResolver: StyleUrlResolver, styleHost, stylePromises: List<Promise>) {
     super();
-    this._templateUrl = templateUrl;
+    this._templateUrl = template.absUrl;
     this._styleUrlResolver = styleUrlResolver;
     this._styleHost = styleHost;
   }
@@ -257,19 +254,20 @@ class _EmulatedUnscopedCssStep extends NS.CompileStep {
 
 class _EmulatedScopedCssStep extends NS.CompileStep {
   _templateUrl: string;
-  _component: Type;
+  _template: Template;
   _styleInliner: StyleInliner;
   _styleUrlResolver: StyleUrlResolver;
   _styleHost;
+  _stylePromises;
 
-  constructor(cmpMetadata: DirectiveMetadata, templateUrl: string, styleInliner: StyleInliner,
-    styleUrlResolver: StyleUrlResolver, styleHost) {
+  constructor(template: Template, styleInliner: StyleInliner,
+    styleUrlResolver: StyleUrlResolver, styleHost, stylePromises: List<Promise>) {
     super();
-    this._templateUrl = templateUrl;
-    this._component = cmpMetadata.type;
+    this._template = template;
     this._styleInliner = styleInliner;
     this._styleUrlResolver = styleUrlResolver;
     this._styleHost = styleHost;
+    this._stylePromises = stylePromises;
   }
 
   process(parent:CompileElement, current:CompileElement, control:CompileControl) {
@@ -277,18 +275,18 @@ class _EmulatedScopedCssStep extends NS.CompileStep {
 
     var cssText = DOM.getText(styleEl);
 
-    cssText = this._styleUrlResolver.resolveUrls(cssText, this._templateUrl);
-    var css = this._styleInliner.inlineImports(cssText, this._templateUrl);
+    cssText = this._styleUrlResolver.resolveUrls(cssText, this._template.absUrl);
+    var css = this._styleInliner.inlineImports(cssText, this._template.absUrl);
 
     if (PromiseWrapper.isPromise(css)) {
       DOM.setText(styleEl, '');
-      ListWrapper.push(parent.inheritedProtoView.render.stylePromises, css);
+      ListWrapper.push(this._stylePromises, css);
       return css.then((css) => {
-        css = _shimCssForComponent(css, this._component);
+        css = _shimCssForComponent(css, this._template);
         DOM.setText(styleEl, css);
       });
     } else {
-      css = _shimCssForComponent(css, this._component);
+      css = _shimCssForComponent(css, this._template);
       DOM.setText(styleEl, css);
     }
 
@@ -321,16 +319,20 @@ function _moveViewNodesIntoParent(parent, view) {
   }
 }
 
-var _componentUIDs: Map<Type, int> = MapWrapper.create();
+var _componentUIDs: Map<string, int> = MapWrapper.create();
 var _nextComponentUID: int = 0;
 var _sharedStyleTexts: Map<string, boolean> = MapWrapper.create();
 var _lastInsertedStyleEl;
 
-function _getComponentId(component: Type) {
-  var id = MapWrapper.get(_componentUIDs, component);
+function _createAppId() {
+  return _nextComponentUID++;
+}
+
+function _getComponentId(template: Template) {
+  var id = MapWrapper.get(_componentUIDs, template.id);
   if (isBlank(id)) {
     id = _nextComponentUID++;
-    MapWrapper.set(_componentUIDs, component, id);
+    MapWrapper.set(_componentUIDs, template.id, id);
   }
   return id;
 }
@@ -359,8 +361,8 @@ function _getContentAttribute(id: int) {
   return `_ngcontent-${id}`;
 }
 
-function _shimCssForComponent(cssText: string, component: Type): string {
-  var id = _getComponentId(component);
+function _shimCssForComponent(cssText: string, template: Template): string {
+  var id = _getComponentId(template);
   var shadowCss = new ShadowCss();
   return shadowCss.shimCssText(cssText, _getContentAttribute(id), _getHostAttribute(id));
 }

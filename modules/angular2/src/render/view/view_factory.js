@@ -1,29 +1,37 @@
 import {OpaqueToken} from 'angular2/di';
-import {DOM} from 'angular2/src/dom/dom_adapter';
+import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 
-import {RenderViewContainer} from './render_view_container';
-import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
-import {Content} from './shadow_dom/emulation/content_tag';
-import {EventManager} from 'angular2/src/render/events/event_manager';
+import {DOM} from 'angular2/src/dom/dom_adapter';
 
-import {ProtoRenderView, RenderView} from './render_view';
+import {Content} from '../shadow_dom/emulation/content_tag';
+import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
+import {EventManager} from '../events/event_manager';
 
-export var VIEW_POOL_CAPACITY = new OpaqueToken('RenderViewFactory.viewPoolCapacity');
+import {ViewContainer} from './view_container';
+import {ProtoView} from './proto_view';
+import {View} from './view';
+import {NG_BINDING_CLASS_SELECTOR, NG_BINDING_CLASS} from './util';
 
-const NG_BINDING_CLASS_SELECTOR = '.ng-binding';
-const NG_BINDING_CLASS = 'ng-binding';
+import {ProtoViewBuilder} from './proto_view_builder';
 
-export class RenderViewFactory {
+export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
+
+
+export class ViewFactory {
   _poolCapacity:number;
-  _pooledViews:List<RenderView>;
+  _pooledViews:List<View>;
+  _eventManager:EventManager;
+  _shadowDomStrategy:ShadowDomStrategy;
 
-  constructor(capacity) {
+  constructor(capacity, eventManager, shadowDomStrategy) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
+    this._eventManager = eventManager;
+    this._shadowDomStrategy = shadowDomStrategy;
   }
 
-  getView(protoRenderView:ProtoRenderView, eventManager: EventManager): RenderView {
+  getView(protoView:ProtoView): View {
     // TODO(tbosch): benchmark this scanning of views and maybe
     // replace it with a fancy LRU Map/List combination...
     for (var i=0; i<this._pooledViews.length; i++) {
@@ -32,24 +40,34 @@ export class RenderViewFactory {
         return ListWrapper.removeAt(this._pooledViews, i);
       }
     }
-    return this._createView(protoRenderView, eventManager);
+    return this._createView(protoView);
   }
 
+  getRootView(elementOrSelector) {
+    var element = elementOrSelector; // TODO: select the element if it is not a real element...
+    var rootProtoViewBuilder = new ProtoViewBuilder(element);
+    rootProtoViewBuilder.bindElement(element, 'root element');
+    this._shadowDomStrategy.shimAppElement(element);
+    return this.getView(rootProtoViewBuilder.build());
+  }
 
-  returnView(view:RenderView) {
+  returnView(view:View) {
+    if (view.hydrated()) {
+      view.dehydrate();
+    }
     ListWrapper.push(this._pooledViews, view);
     while (this._pooledViews.length > this._poolCapacity) {
       ListWrapper.removeAt(this._pooledViews, 0);
     }
   }
 
-  _createView(protoRenderView:ProtoRenderView, eventManager: EventManager): RenderView {
-    var rootElementClone = protoRenderView.instantiateInPlace ? protoRenderView.element : DOM.importIntoDoc(protoRenderView.element);
+  _createView(protoView:ProtoView): View {
+    var rootElementClone = protoView.instantiateInPlace ? protoView.element : DOM.importIntoDoc(protoView.element);
     var elementsWithBindingsDynamic;
-    if (protoRenderView.isTemplateElement) {
+    if (protoView.isTemplateElement) {
       elementsWithBindingsDynamic = DOM.querySelectorAll(DOM.content(rootElementClone), NG_BINDING_CLASS_SELECTOR);
     } else {
-      elementsWithBindingsDynamic= DOM.getElementsByClassName(rootElementClone, NG_BINDING_CLASS);
+      elementsWithBindingsDynamic = DOM.getElementsByClassName(rootElementClone, NG_BINDING_CLASS);
     }
 
     var elementsWithBindings = ListWrapper.createFixedSize(elementsWithBindingsDynamic.length);
@@ -58,7 +76,7 @@ export class RenderViewFactory {
     }
 
     var viewRootNodes;
-    if (protoRenderView.isTemplateElement) {
+    if (protoView.isTemplateElement) {
       var childNode = DOM.firstChild(DOM.content(rootElementClone));
       viewRootNodes = []; // TODO(perf): Should be fixed size, since we could pre-compute in in ProtoView
       // Note: An explicit loop is the fastest way to convert a DOM array into a JS array!
@@ -70,7 +88,7 @@ export class RenderViewFactory {
       viewRootNodes = [rootElementClone];
     }
 
-    var binders = protoRenderView.elementBinders;
+    var binders = protoView.elementBinders;
     var boundTextNodes = [];
     var boundElements = ListWrapper.createFixedSize(binders.length);
     var viewContainers = ListWrapper.createFixedSize(binders.length);
@@ -79,29 +97,30 @@ export class RenderViewFactory {
     for (var binderIdx = 0; binderIdx < binders.length; binderIdx++) {
       var binder = binders[binderIdx];
       var element;
-      if (binderIdx === 0 && protoRenderView.rootBindingOffset === 1) {
+      if (binderIdx === 0 && protoView.rootBindingOffset === 1) {
         element = rootElementClone;
       } else {
-        element = elementsWithBindings[binderIdx - protoRenderView.rootBindingOffset];
+        element = elementsWithBindings[binderIdx - protoView.rootBindingOffset];
       }
       boundElements[binderIdx] = element;
 
       // boundTextNodes
-      var textNodeIndices = binder.textNodeIndices;
-      if (isPresent(textNodeIndices)) {
+      if (MapWrapper.size(binder.textBindings) > 0) {
         var childNode = DOM.firstChild(DOM.templateAwareRoot(element));
-        for (var j = 0, k = 0; j < textNodeIndices.length; j++) {
-          for(var index = textNodeIndices[j]; k < index; k++) {
-            childNode = DOM.nextSibling(childNode);
+        var index = 0;
+        while (isPresent(childNode)) {
+          if (isPresent(MapWrapper.get(binder.textBindings, index))) {
+            ListWrapper.push(boundTextNodes, childNode);
           }
-          ListWrapper.push(boundTextNodes, childNode);
+          childNode = DOM.nextSibling(childNode);
+          index++;
         }
       }
 
       // viewContainers
       var viewContainer = null;
-      if (binder.isViewContainer) {
-        viewContainer = new RenderViewContainer(this, element, binder.nestedProtoView, eventManager);
+      if (isPresent(binder.nestedProtoView)) {
+        viewContainer = new ViewContainer(this, element);
       }
       viewContainers[binderIdx] = viewContainer;
 
@@ -113,8 +132,8 @@ export class RenderViewFactory {
       contentTags[binderIdx] = contentTag;
     }
 
-    var view = new RenderView(
-      protoRenderView, viewRootNodes, eventManager,
+    var view = new View(
+      protoView, viewRootNodes, this._eventManager, this._shadowDomStrategy,
       boundTextNodes, boundElements, viewContainers, contentTags
     );
 

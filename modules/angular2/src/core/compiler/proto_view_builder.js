@@ -1,248 +1,167 @@
 import {isPresent} from 'angular2/src/facade/lang';
 import {List, ListWrapper, Map, MapWrapper} from 'angular2/src/facade/collection';
-import {AST, ChangeDetection, BindingRecord} from 'angular2/change_detection';
+import {AST, ChangeDetection, BindingRecord, Parser} from 'angular2/change_detection';
 
 import {ElementBinder} from './element_binder';
-import {ProtoView} from './view';
+import {ProtoView} from './proto_view';
+import {ProtoElementInjector, ComponentKeyMetaData, DirectiveBinding} from './element_injector';
 
-import {RenderProtoViewBuilder, RenderElementBinderBuilder} from 'angular2/src/render/render_proto_view_builder';
-import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
+import * as renderApi from 'angular2/render_api';
 
 export class ProtoViewBuilder {
-  render:RenderProtoViewBuilder;
-  elements:List<ElementBinderBuilder>;
-  variables:List<_Variable>;
+  _changeDetection: ChangeDetection;
+  _parser: Parser;
+  _renderProtoView: renderApi.ProtoView;
+  _eventHandlers: List;
+  _bindingRecords: List;
+  _elementBinders: List;
+  _inheritedProtoElementInjectors: List;
+  _inheritedProtoElementInjectorDistances: List;
+  _variableBindings: List;
+  _protoLocals: Map;
+  _textNodesWithBindingCount: number;
 
-  constructor(render: RenderProtoViewBuilder) {
-    this.elements = [];
-    this.variables = [];
-    this.render = render;
+  constructor(changeDetection:ChangeDetection, parser: Parser) {
+    this._changeDetection = changeDetection;
+    this._parser = parser;
   }
 
-  bindElement():ElementBinderBuilder {
-    var builder = new ElementBinderBuilder(this.elements.length, this.render.bindElement());
-    ListWrapper.push(this.elements, builder);
-    return builder;
+  init(renderProtoView: renderApi.ProtoView):ProtoViewBuilder {
+    this._renderProtoView = renderProtoView;
+    this._eventHandlers = [];
+    this._bindingRecords = [];
+    this._elementBinders = [];
+    this._inheritedProtoElementInjectors = [];
+    this._inheritedProtoElementInjectorDistances = []
+    this._variableBindings = ListWrapper.create(); // TODO
+    this._protoLocals = MapWrapper.create(); // TODO
+    this._textNodesWithBindingCount = 0;
+    return this;
   }
 
-  bindVariable(contextName:string, templateName:string) {
-    ListWrapper.push(this.variables, new _Variable(contextName, templateName));
-  }
-
-  build(changeDetection:ChangeDetection, shadowDomStrategy:ShadowDomStrategy):ProtoView {
-    var protoRenderView = this.render.build(shadowDomStrategy);
-    var elementBinders = [];
-    var nestedProtoViews = [];
-    var bindingRecords = [];
-    var boundTextNodeCount = 0;
-    ListWrapper.forEach(this.elements, (ebb) => {
-      var nestedView = null;
-      if (isPresent(ebb.nestedProtoView)) {
-        nestedView = ebb.nestedProtoView.build(changeDetection, shadowDomStrategy);
-        ListWrapper.push(nestedProtoView, nestedView);
-      }
-
-      // TODO fill bindingRecords
-      ListWrapper.forEach(ebb.textExpressions, (expression) => {
-        var memento = boundTextNodeCount++;
-        ListWrapper.push(bindingRecords, new BindingRecord(expression, memento, null));
-      });
-
-      var events = null; // TODO
-      // TODO When present the component directive must be first
-      var protoElementInjector = null; // TODO
-      var elBinder = new ElementBinder(
-        protoElementInjector,
-        isPresent(ebb.componentDirective) ? ebb.componentDirective.directive : null,
-        isPresent(ebb.viewportDirective) ? ebb.viewportDirective.directive : null,
-        nestedView,
-        events
-      );
-      ListWrapper.push(elementBinders, elBinder);
+  build():ProtoView {
+    ListWrapper.forEach(this._renderProtoView.elementBinders, (renderElementBinder) => {
+      this._processElementBinder(renderElementBinder);
     });
-    var eventHandlers = []; // TODO
-    var variableBindings = []; // TODO
-    var protoLocals = MapWrapper.create(); // TODO
 
-    var pv = new ProtoView(
-      protoRenderView,
-      changeDetection.createProtoChangeDetector('dummy'),
-      elementBinders,
-      eventHandlers,
-      bindingRecords,
-      variableBindings,
-      protoLocals
+    return new ProtoView(
+      this._renderProtoView,
+      this._changeDetection.createProtoChangeDetector('dummy'),
+      this._elementBinders,
+      this._eventHandlers,
+      this._bindingRecords,
+      this._variableBindings,
+      this._protoLocals
     );
-    ListWrapper.forEach(nestedProtoViews, (nestedView) => {
-      nestedView.parent = pv;
-    });
-    return pv;
   }
+
+  _processElementBinder(renderElementBinder: renderApi.ElementBinder) {
+    var componentDirective = null;
+    var viewportDirective = null;
+    var allDirectives = [];
+    ListWrapper.forEach(renderElementBinder.directives, (renderDirective) => {
+      var directive = this._resolveDirective(renderDirective);
+      if (directive.annotation instanceof Component) {
+        componentDirective = directive;
+        // componentDirective needs to be first, so don't
+        // add it immediately to the allDirectives array
+      } else if (directive.annotation instanceof Template) {
+        viewportDirective = directive;
+        ListWrapper.push(allDirectives, directive);
+      } else {
+        ListWrapper.push(allDirectives, directive);
+      }
+    });
+    if (isPresent(componentDirective)) {
+      // componentDirective needs to be first!
+      ListWrapper.insert(allDirectives, 0, componentDirective);
+    }
+
+    var protoElementInjector = this._createProtoElementInjector(
+      renderElementBinder,
+      allDirectives
+    );
+    this._processTextBindings(renderElementBinder);
+
+    var events = null; // TODO
+
+    var nestedProtoView = null;
+    if (isPresent(renderElementBinder.nestedProtoView)) {
+      nestedProtoView = new ProtoViewBuilder(
+        this._changeDetection, this._parser
+      ).init(renderElementBinder.nestedProtoView).build();
+    }
+    ListWrapper.push(this._elementBinders, new ElementBinder(
+      protoElementInjector,
+      componentDirective,
+      viewportDirective,
+      nestedProtoView,
+      events
+    ));
+  }
+
+  _processTextBindings(renderElementBinder) {
+    MapWrapper.forEach(renderElementBinder.textBindings, (expressionStr, nodeIndex) => {
+      var expression = this._parser.parseInterpolation(expressionStr, renderElementBinder.elementDescription);
+      var memento = this._textNodesWithBindingCount++;
+      ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
+    });
+  }
+
+  _createProtoElementInjector(renderElementBinder, allDirectives) {
+    var protoElementInjector = null;
+    var parentProtoElementInjector = null;
+    var distanceToParentElementInjector;
+    var inheritedProtoElementInjector;
+
+    if (renderElementBinder.parentIndex !== -1) {
+      parentProtoElementInjector = this._inheritedProtoElementInjectors[renderElementBinder.parentIndex];
+      distanceToParentElementInjector =
+        this._inheritedProtoElementInjectorDistances[renderElementBinder.parentIndex] + renderElementBinder.distanceToParent;
+      inheritedProtoElementInjector = parentProtoElementInjector;
+    } else {
+      distanceToParentElementInjector = 0;
+      inheritedProtoElementInjector = null;
+    }
+    // Create a protoElementInjector for any element that either has bindings *or* has one
+    // or more var- defined. Elements with a var- defined need a their own element injector
+    // so that, when hydrating, $implicit can be set to the element.
+    if (allDirectives.length > 0 || MapWrapper.size(renderElementBinder.variableBindings) > 0) {
+      // TODO: copy logic from previous proto_element_injector_builder
+      protoElementInjector = new ProtoElementInjector(
+        parentProtoElementInjector,
+        renderElementBinder.index,
+        directives.map(this._createDirectiveBinding),
+        isPresent(componentDirective),
+        distanceToParentElementInjector
+      );
+      inheritedProtoElementInjector = protoElementInjector;
+      distanceToParentElementInjector = 0;
+    }
+    ListWrapper.push(this._inheritedProtoElementInjectors, inheritedProtoElementInjector);
+    ListWrapper.push(this._inheritedProtoElementInjectorDistances, distanceToParentElementInjector);
+    return protoElementInjector;
+  }
+
+  _createDirectiveBinding(d:DirectiveMetadata): DirectiveBinding {
+    return DirectiveBinding.createFromType(d.type, d.annotation);
+  }
+
+  _resolveDirective(directive:renderApi.DirectiveMetadata):DirectiveMetadata {
+    // TODOz: really resolve the DirectiveMetadata for the case that it is
+    // not the real DirectiveMetadata
+    return directive;
+  }
+
 }
 
-export class ElementBinderBuilder {
-  render: RenderElementBinderBuilder;
-  index: number;
-  parent: ElementBinderBuilder;
-  distanceToParent: number;
-  componentDirective:DirectiveBinderBuilder;
-  viewportDirective:DirectiveBinderBuilder;
-  otherDirectives:List<DirectiveBinderBuilder>;
-  textExpressions:List<AST>;
-  properties:List<_Property>;
-  events:List<_Event>;
-  nestedProtoView:ProtoViewBuilder;
-  variables:List<_Variable>;
-
-  constructor(index:number, render: RenderElementBinderBuilder) {
-    this.index = index;
-    this.render = render;
-    this.parent = null;
-    this.distanceToParent = -1;
-    this.events = [];
-    this.componentDirective = null;
-    this.viewportDirective = null;
-    this.otherDirectives = [];
-    this.textExpressions = [];
-    this.variables = [];
-    this.nestedProtoView = null;
-  }
-
-  bindNestedProtoView():ProtoViewBuilder {
-    if (isPresent(nestedProtoView)) {
-      throw new BaseException('Only one nested view per element is allowed');
-    }
-    this.nestedProtoView = new ProtoViewBuilder(this.render.bindNestedProtoView());
-    return this.nestedProtoView;
-  }
-
-  bindDirective(directive: DirectiveMetadata):DirectiveBinderBuilder {
-    var builder = new DirectiveBinderBuilder(this.render, directive);
-    ListWrapper.push(this.directives, builder);
-    return builder;
-  }
-
-  setParent(parent:ElementBinderBuilder, distanceToParent) {
-    this.render.setParent(parent.render, distanceToParent);
-    this.parent = parent;
+class InheritedProtoElementInjector {
+  protoElementInjector:ProtoElementInjector;
+  distanceToParent:number;
+  constructor(
+      protoElementInjector:ProtoElementInjector,
+      distanceToParent:number) {
+    this.protoElementInjector = protoElementInjector;
     this.distanceToParent = distanceToParent;
   }
-
-  setContentTagSelector(contentTagSelector:string) {
-    this.render.setContentTagSelector(contentTagSelector);
-  }
-
-  /**
-   * Adds a text node binding
-   */
-  bindText(indexInParent:number, expression:AST) {
-    this.render.bindText(indexInParent);
-    ListWrapper.push(this.textExpressions, expression);
-  }
-
-  /**
-   * Adds an element property binding
-   */
-  bindProperty(expression:AST, setterName:string, setter:SetterFn) {
-    ListWrapper.push(this.properties, new _Property(expression, setterName, setter));
-  }
-
-  /**
-   * Adds an event binding.
-   *
-   * The event is evaluated in the context of the view.
-   *
-   * @param {string} eventName
-   * @param {AST} expression
-   */
-  bindEvent(eventName:string, expression:AST) {
-    ListWrapper.push(this.events, new _Event(eventName, expression));
-  }
-
-  bindVariable(contextName:string, templateName:string) {
-    ListWrapper.push(this.variables, new _Variable(contextName, templateName));
-  }
 }
-
-export class DirectiveBinderBuilder {
-  render:RenderElementBinderBuilder;
-  directive: DirectiveMetadata;
-  component: boolean;
-  viewport: boolean;
-  events:List<_Event>;
-  properties:List<_Property>;
-
-  constructor(render: RenderElementBinderBuild, directive: DirectiveMetadata) {
-    this.render = render;
-    this.directive = directive;
-    this.events = [];
-    this.properties = [];
-    this.viewport = false;
-    this.component = false;
-  }
-
-  setViewport(value:boolean):DirectiveBinderBuilder {
-    this.viewport = value;
-    this.render.setHasViewContainerDirective(true);
-    return this;
-  }
-
-  setComponent(value:boolean):DirectiveBinderBuilder {
-    this.component = value;
-    return this;
-  }
-
-  /**
-   * Adds an event binding for the directive.
-   *
-   * The event is evaluated in the context of
-   * the current directive.
-   *
-   * @param {string} eventName
-   * @param {AST} expression
-   */
-  bindEvent(eventName:string, expression:AST) {
-    ListWrapper.push(this.events, new _Event(eventName, expression));
-  }
-
-  /**
-   * Adds a directive property binding for the directive.
-   */
-  bindProperty(
-    expression:AST,
-    setterName:string,
-    setter:SetterFn) {
-    ListWrapper.push(this.properties, new _Property(expression, setterName, setter));
-  }
-}
-
-class _Variable {
-  contextName: string;
-  templateName: string;
-
-  constructor(contextName:string, templateName:string) {
-    this.contextName = contextName;
-    this.templateName = templateName;
-  }
-}
-
-class _Property {
-  expression:AST;
-  setterName:string;
-  setter:SetterFn;
-  constructor(expression:AST, setterName:string, setter:SetterFn) {
-    this.expression = expression;
-    this.setterName = setterName;
-    this.setter = setter;
-  }
-}
-
-class _Event {
-  eventName:string;
-  expression:AST;
-  constructor(eventName, expression) {
-    this.eventName = eventName;
-    this.expression = expression;
-  }
-}
-

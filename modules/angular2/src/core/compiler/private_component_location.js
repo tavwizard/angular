@@ -1,5 +1,5 @@
 import {Directive} from 'angular2/src/core/annotations/annotations'
-import {NgElement} from 'angular2/src/render/ng_element';
+import {NgElement} from './ng_element';
 import * as viewModule from './view';
 import * as eiModule from './element_injector';
 import {ShadowDomStrategy} from 'angular2/src/render/shadow_dom/shadow_dom_strategy';
@@ -21,20 +21,17 @@ export class PrivateComponentLocation {
     this._viewFactory = viewFactory;
   }
 
-  createComponent(type:Type, annotation:Directive, componentProtoView:viewModule.ProtoView,
-                  eventManager:EventManager, shadowDomStrategy:ShadowDomStrategy) {
+  createComponent(type:Type, annotation:Directive, componentProtoView:viewModule.ProtoView) {
     var context = this._elementInjector.createPrivateComponent(type, annotation);
 
-    var renderView = this._viewFactory.render.getView(componentProtoView.render, eventManager);
-    var view = this._viewFactory.getView(renderView, componentProtoView, this._elementInjector, eventManager);
+    var view = this._viewFactory.getView(componentProtoView, this._elementInjector);
 
     this._view.render.setComponentView(
       this._elementInjector.getElementBinderIndex(),
-      renderView
+      view.render
     );
     ListWrapper.push(this._view.componentChildViews, view);
 
-    renderView.hydrate(null);
     view.hydrate(this._elementInjector.getShadowDomAppInjector(), this._elementInjector, context, null);
     this._view.changeDetector.addChild(view.changeDetector);
   }

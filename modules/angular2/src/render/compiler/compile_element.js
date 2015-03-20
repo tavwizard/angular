@@ -1,12 +1,11 @@
 import {List, Map, ListWrapper, MapWrapper} from 'angular2/src/facade/collection';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {int, isBlank, isPresent, Type, StringJoiner, assertionsEnabled} from 'angular2/src/facade/lang';
-import {DirectiveMetadata} from '../directive_metadata';
-import {Decorator, Component, Viewport, DynamicComponent} from '../../annotations/annotations';
-import {ProtoViewBuilder, ElementBinderBuilder} from '../proto_view_builder';
+import {RenderProtoViewBuilder, RenderElementBinderBuilder} from '../view/proto_view_builder';
 import {dashCaseToCamelCase} from './util';
 
 import {AST} from 'angular2/change_detection';
+import {ProtoViewBuilder, ElementBinderBuilder} from '../view/proto_view_builder';
 
 /**
  * Collects all data that is needed to process an element
@@ -17,40 +16,19 @@ export class CompileElement {
   element;
   _attrs:Map;
   _classList:List;
-  textNodeBindings:Map;
-  propertyBindings:Map;
-  eventBindings:Map;
-
-  /// Store directive name to template name mapping.
-  /// Directive name is what the directive exports the variable as
-  /// Template name is how it is reffered to it in template
-  variableBindings:Map;
-  decoratorDirectives:List<DirectiveMetadata>;
-  viewportDirective:DirectiveMetadata;
-  componentDirective:DirectiveMetadata;
   isViewRoot:boolean;
-  hasBindings:boolean;
   inheritedProtoView:ProtoViewBuilder;
+  distanceToParentBinder:number;
   inheritedElementBinder:ElementBinderBuilder;
-  distanceToParentBinder:int;
   compileChildren: boolean;
   ignoreBindings: boolean;
   elementDescription: string; // e.g. '<div [class]="foo">' : used to provide context in case of error
-  contentTagSelector: string;
 
   constructor(element, compilationUnit = '') {
     this.element = element;
     this._attrs = null;
     this._classList = null;
-    this.textNodeBindings = null;
-    this.propertyBindings = null;
-    this.eventBindings = null;
-    this.variableBindings = null;
-    this.decoratorDirectives = null;
-    this.viewportDirective = null;
-    this.componentDirective = null;
     this.isViewRoot = false;
-    this.hasBindings = false;
     // inherited down to children if they don't have
     // an own protoView
     this.inheritedProtoView = null;
@@ -61,7 +39,6 @@ export class CompileElement {
     this.compileChildren = true;
     // set to true to ignore all the bindings on the element
     this.ignoreBindings = false;
-    this.contentTagSelector = null;
     // description is calculated here as compilation steps may change the element
     var tplDesc = assertionsEnabled()? getElementDescription(element) : null;
     if (compilationUnit !== '') {
@@ -70,6 +47,13 @@ export class CompileElement {
     } else {
       this.elementDescription = tplDesc;
     }
+  }
+
+  bindElement() {
+    if (isBlank(this.inheritedElementBinder)) {
+      this.inheritedElementBinder = this.inheritedProtoView.bindElement(this.element, this.elementDescription);
+    }
+    return this.inheritedElementBinder;
   }
 
   refreshAttrs() {
@@ -96,60 +80,6 @@ export class CompileElement {
       }
     }
     return this._classList;
-  }
-
-  addTextNodeBinding(indexInParent:int, expression:AST) {
-    if (isBlank(this.textNodeBindings)) {
-      this.textNodeBindings = MapWrapper.create();
-    }
-    MapWrapper.set(this.textNodeBindings, indexInParent, expression);
-  }
-
-  addPropertyBinding(property:string, expression:AST) {
-    if (isBlank(this.propertyBindings)) {
-      this.propertyBindings = MapWrapper.create();
-    }
-    MapWrapper.set(this.propertyBindings, dashCaseToCamelCase(property), expression);
-  }
-
-  addVariableBinding(variableName:string, variableValue:string) {
-    if (isBlank(this.variableBindings)) {
-      this.variableBindings = MapWrapper.create();
-    }
-
-    // Store the variable map from value to variable, reflecting how it will be used later by
-    // View. When a local is set to the view, a lookup for the variable name will take place keyed
-    // by the "value", or exported identifier. For example, ng-repeat sets a view local of "index".
-    // When this occurs, a lookup keyed by "index" must occur to find if there is a var referencing
-    // it.
-    MapWrapper.set(this.variableBindings, variableValue, variableName);
-  }
-
-  addEventBinding(eventName:string, expression:AST) {
-    if (isBlank(this.eventBindings)) {
-      this.eventBindings = MapWrapper.create();
-    }
-    MapWrapper.set(this.eventBindings, eventName, expression);
-  }
-
-  addDirective(directive:DirectiveMetadata) {
-    var annotation = directive.annotation;
-    this._allDirectives = null;
-    if (annotation instanceof Decorator) {
-      if (isBlank(this.decoratorDirectives)) {
-        this.decoratorDirectives = ListWrapper.create();
-      }
-      ListWrapper.push(this.decoratorDirectives, directive);
-      if (!annotation.compileChildren) {
-        this.compileChildren = false;
-      }
-    } else if (annotation instanceof Viewport) {
-      this.viewportDirective = directive;
-    } else if (annotation instanceof Component) {
-      this.componentDirective = directive;
-    } else if (annotation instanceof DynamicComponent) {
-      this.componentDirective = directive;
-    }
   }
 
 }

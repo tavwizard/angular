@@ -2,8 +2,7 @@ import {int, isBlank, BaseException} from 'angular2/src/facade/lang';
 import * as eiModule from './element_injector';
 import {DirectiveMetadata} from './directive_metadata';
 import {List, StringMap} from 'angular2/src/facade/collection';
-import {ProtoView} from './view';
-import {RenderElementBinder} from 'angular2/src/render/render_element_binder';
+import {ProtoView} from './proto_view';
 
 export class ElementBinder {
   protoElementInjector:eiModule.ProtoElementInjector;

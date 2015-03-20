@@ -6,7 +6,7 @@ import {Parent, Ancestor} from 'angular2/src/core/annotations/visibility';
 import {EventEmitter, PropertySetter} from 'angular2/src/core/annotations/di';
 import * as viewModule from 'angular2/src/core/compiler/view';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
-import {NgElement} from 'angular2/src/render/ng_element';
+import {NgElement} from './ng_element';
 import {Directive, onChange, onDestroy} from 'angular2/src/core/annotations/annotations'
 import {BindingPropagationConfig} from 'angular2/src/core/compiler/binding_propagation_config'
 import * as pclModule from 'angular2/src/core/compiler/private_component_location';
@@ -270,8 +270,8 @@ export class ProtoElementInjector  {
     }
   }
 
-  instantiate(parent:ElementInjector, host:ElementInjector):ElementInjector {
-    return new ElementInjector(this, parent, host);
+  instantiate(parent:ElementInjector):ElementInjector {
+    return new ElementInjector(this, parent);
   }
 
   directParent(): ProtoElementInjector {
@@ -327,18 +327,9 @@ export class ElementInjector extends TreeNode {
   _privateComponent;
   _privateComponentBinding:DirectiveBinding;
 
-  constructor(proto:ProtoElementInjector, parent:ElementInjector, host:ElementInjector) {
+  constructor(proto:ProtoElementInjector, parent:ElementInjector) {
     super(parent);
-    if (isPresent(parent) && isPresent(host)) {
-      throw new BaseException('Only either parent or host is allowed');
-    }
-    this._host = null; // needed to satisfy Dart
-    if (isPresent(parent)) {
-      this._host = parent._host;
-    } else {
-      this._host = host;
-    }
-
+    this._host = null;
     this._proto = proto;
 
     //we cannot call clearDirectives because fields won't be detected
@@ -359,6 +350,7 @@ export class ElementInjector extends TreeNode {
   }
 
   clearDirectives() {
+    this._host = null;
     this._preBuiltObjects = null;
     this._lightDomAppInjector = null;
     this._shadowDomAppInjector = null;
@@ -394,7 +386,8 @@ export class ElementInjector extends TreeNode {
     this._constructionCounter = 0;
   }
 
-  instantiateDirectives(lightDomAppInjector:Injector, shadowDomAppInjector:Injector, preBuiltObjects:PreBuiltObjects) {
+  instantiateDirectives(lightDomAppInjector:Injector, shadowDomAppInjector:Injector, host:ElementInjector, preBuiltObjects:PreBuiltObjects) {
+    this._host = host;
     this._checkShadowDomAppInjector(shadowDomAppInjector);
 
     this._preBuiltObjects = preBuiltObjects;
