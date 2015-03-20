@@ -2,7 +2,7 @@ import {isPresent} from 'angular2/src/facade/lang';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 
 import * as api from '../api';
-import {NG_BINDING_CLASS} from './util';
+import {NG_BINDING_CLASS} from '../util';
 
 export class ProtoView extends api.ProtoView {
   element;

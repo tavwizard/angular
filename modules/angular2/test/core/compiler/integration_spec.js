@@ -46,6 +46,8 @@ import {ViewFactory} from 'angular2/src/core/compiler/view_factory';
 import {DirectRenderer} from 'angular2/src/render/direct_renderer';
 import * as renderCompilerModule from 'angular2/src/render/compiler/compiler';
 import * as renderViewFactoryModule from 'angular2/src/render/view/view_factory';
+import {ElementPropertyAccessor} from 'angular2/src/render/view/element_property_accessor';
+import {ViewServices} from 'angular2/src/render/view/view_services';
 
 export function main() {
   ddescribe('integration tests', function() {
@@ -79,14 +81,15 @@ export function main() {
       var eventManager = null;
       var renderViewFactory = new renderViewFactoryModule.ViewFactory(
         1,
-        eventManager,
-        shadowDomStrategy
+        new ViewServices(
+          eventManager,
+          shadowDomStrategy,
+          new ElementPropertyAccessor()
+        )
       );
 
       renderer = new DirectRenderer(
         renderCompiler,
-        eventManager,
-        shadowDomStrategy,
         renderViewFactory
       );
 
@@ -118,7 +121,7 @@ export function main() {
         view = rootView.componentChildViews[0];
       }
 
-      iit('should consume text node changes', inject([AsyncTestCompleter], (async) => {
+      it('should consume text node changes', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div>{{ctxProp}}</div>'}));
         compiler.compile(MyComp).then((pv) => {
           createView(pv);
@@ -196,7 +199,7 @@ export function main() {
         });
       }));
 
-      it('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
+      iit('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div inner-html="{{ctxProp}}"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {

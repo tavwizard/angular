@@ -125,7 +125,7 @@ export class ViewFactory {
       if (isPresent(binder.viewportDirective)) {
         viewContainer = new ViewContainer(
           this,
-          renderView.viewContainers[binderIdx], view, binder.nestedProtoView,
+          renderView.getViewContainer(binderIdx), view, binder.nestedProtoView,
           elementInjector
         );
       }

@@ -1,4 +1,4 @@
-import {isPresent, isBlank, RegExpWrapper, BaseException} from 'angular2/src/facade/lang';
+import {isPresent, isBlank, RegExpWrapper, BaseException, StringWrapper} from 'angular2/src/facade/lang';
 import {MapWrapper} from 'angular2/src/facade/collection';
 
 import {Parser, AST, ExpressionWithSource} from 'angular2/change_detection';
@@ -7,7 +7,7 @@ import {CompileStep} from './compile_step';
 import {CompileElement} from './compile_element';
 import {CompileControl} from './compile_control';
 
-import {isInterpolation} from './util';
+import {isInterpolation, dashCaseToCamelCase} from '../util';
 
 // TODO(tbosch): Cannot make this const/final right now because of the transpiler...
 // Group 1 = "bind"
@@ -38,65 +38,71 @@ export class PropertyBindingParser extends CompileStep {
     }
 
     var attrs = current.attrs();
+    var newAttrs = MapWrapper.create();
 
     MapWrapper.forEach(attrs, (attrValue, attrName) => {
       var bindParts = RegExpWrapper.firstMatch(BIND_NAME_REGEXP, attrName);
       if (isPresent(bindParts)) {
         if (isPresent(bindParts[1])) {
           // match: bind-prop
-          this._bindProperty(bindParts[4], attrValue);
+          this._bindProperty(bindParts[4], attrValue, current);
         } else if (isPresent(bindParts[2]) || isPresent(bindParts[7])) {
           // match: var-name / var-name="iden" / #name / #name="iden"
           var identifier = (isPresent(bindParts[4]) && bindParts[4] !== '') ?
               bindParts[4] : bindParts[8];
           var value = attrValue == '' ? '\$implicit' : attrValue;
-          this._bindVariable(identifier, value, current);
+          this._bindVariable(identifier, value, current, newAttrs);
         } else if (isPresent(bindParts[3])) {
           // match: on-event
-          this._bindEvent(bindParts[4], attrValue, current);
+          this._bindEvent(bindParts[4], attrValue, current, newAttrs);
         } else if (isPresent(bindParts[5])) {
           // match: [prop]
-          this._bindProperty(bindParts[5], attrValue);
+          this._bindProperty(bindParts[5], attrValue, current, newAttrs);
         } else if (isPresent(bindParts[6])) {
           // match: (event)
-          this._bindEvent(bindParts[6], attrValue, current);
+          this._bindEvent(bindParts[6], attrValue, current, newAttrs);
         }
-      } else if (StringWrapper.equals(name, 'template')) {
-        this._parseTemplateBindings(attrValue, current);
+      } else if (StringWrapper.equals(attrName, 'template')) {
+        this._parseTemplateBindings(attrValue, current, newAttrs);
       } else if (isInterpolation(attrValue)) {
-        current.bindElement().bindPropertyInterpolation(attrName, attrValue);
+        current.bindElement().bindPropertyInterpolation(dashCaseToCamelCase(attrName), attrValue);
       } else {
-        current.bindElement().bindInitAttr(attrName, attrValue);
+        current.bindElement().bindInitAttr(dashCaseToCamelCase(attrName), attrValue);
       }
     });
+
+    MapWrapper.forEach(newAttrs, (attrValue, attrName) => {
+      MapWrapper.set(attrs, attrName, attrValue);
+    });
+
   }
 
-  _bindVariable(identifier, value, current:CompileElement) {
-    current.bindElement().bindVariable(identifier, value);
-    MapWrapper.set(current.attrs(), identifier, value);
+  _bindVariable(identifier, value, current:CompileElement, newAttrs) {
+    current.bindElement().bindVariable(dashCaseToCamelCase(identifier), value);
+    MapWrapper.set(newAttrs, identifier, value);
   }
 
-  _bindProperty(name, expression, current:CompileElement) {
-    current.bindElement().bindProperty(name, expression);
-    MapWrapper.set(current.attrs(), name, expression);
+  _bindProperty(name, expression, current:CompileElement, newAttrs) {
+    current.bindElement().bindProperty(dashCaseToCamelCase(name), expression);
+    MapWrapper.set(newAttrs, name, expression);
   }
 
-  _bindEvent(name, expression, current:CompileElement) {
-    current.bindElement().bindEvent(name, expression);
+  _bindEvent(name, expression, current:CompileElement, newAttrs) {
+    current.bindElement().bindEvent(dashCaseToCamelCase(name), expression);
     // Don't detect directives for event names for now,
     // so don't add the event name to the CompileElement.attrs
   }
 
-  _parseTemplateBindings(templateBindings:string, current:CompileElement) {
+  _parseTemplateBindings(templateBindings:string, current:CompileElement, newAttrs) {
     // Note: We are using the parser only to be able to split property bindings and variable
     // bindings apart, so that we can find directives that match
     var bindings = this._parser.parseTemplateBindings(templateBindings, compileElement.elementDescription);
     for (var i=0; i<bindings.length; i++) {
       var binding = bindings[i];
       if (binding.keyIsVar) {
-        this._bindVariable(binding.key, binding.name, current);
+        this._bindVariable(binding.key, binding.name, current, newAttrs);
       } else if (isPresent(binding.expression)) {
-        this._bindProperty(binding.key, binding.expression.source, current);
+        this._bindProperty(binding.key, binding.expression.source, current, newAttrs);
       } else {
         DOM.setAttribute(compileElement.element, binding.key, '');
       }

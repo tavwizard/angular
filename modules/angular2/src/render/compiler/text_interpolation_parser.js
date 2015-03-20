@@ -7,7 +7,7 @@ import {CompileStep} from './compile_step';
 import {CompileElement} from './compile_element';
 import {CompileControl} from './compile_control';
 
-import {isInterpolation} from './util';
+import {isInterpolation} from '../util';
 
 /**
  * Parses interpolations in direct text child nodes of the current element.

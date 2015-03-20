@@ -3,7 +3,7 @@ import {List, ListWrapper, Map, MapWrapper} from 'angular2/src/facade/collection
 import {AST, ChangeDetection, BindingRecord, Parser} from 'angular2/change_detection';
 
 import {ElementBinder} from './element_binder';
-import {ProtoView} from './proto_view';
+import {ProtoView, ElementBindingMemento} from './proto_view';
 import {ProtoElementInjector, ComponentKeyMetaData, DirectiveBinding} from './element_injector';
 
 import * as renderApi from 'angular2/render_api';
@@ -82,6 +82,8 @@ export class ProtoViewBuilder {
       allDirectives
     );
     this._processTextBindings(renderElementBinder);
+    this._processPropertyBindings(renderElementBinder);
+    this._processPropertyInterpolations(renderElementBinder);
 
     var events = null; // TODO
 
@@ -104,6 +106,22 @@ export class ProtoViewBuilder {
     MapWrapper.forEach(renderElementBinder.textBindings, (expressionStr, nodeIndex) => {
       var expression = this._parser.parseInterpolation(expressionStr, renderElementBinder.elementDescription);
       var memento = this._textNodesWithBindingCount++;
+      ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
+    });
+  }
+
+  _processPropertyBindings(renderElementBinder) {
+    MapWrapper.forEach(renderElementBinder.propertyBindings, (expressionStr, propertyName) => {
+      var expression = this._parser.parseBinding(expressionStr, renderElementBinder.elementDescription);
+      var memento = new ElementBindingMemento(renderElementBinder.index, propertyName);
+      ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
+    });
+  }
+
+  _processPropertyInterpolations(renderElementBinder) {
+    MapWrapper.forEach(renderElementBinder.propertyInterpolations, (expressionStr, propertyName) => {
+      var expression = this._parser.parseInterpolation(expressionStr, renderElementBinder.elementDescription);
+      var memento = new ElementBindingMemento(renderElementBinder.index, propertyName);
       ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
     });
   }

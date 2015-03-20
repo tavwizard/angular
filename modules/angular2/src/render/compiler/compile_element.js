@@ -2,7 +2,7 @@ import {List, Map, ListWrapper, MapWrapper} from 'angular2/src/facade/collection
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {int, isBlank, isPresent, Type, StringJoiner, assertionsEnabled} from 'angular2/src/facade/lang';
 import {RenderProtoViewBuilder, RenderElementBinderBuilder} from '../view/proto_view_builder';
-import {dashCaseToCamelCase} from './util';
+import {dashCaseToCamelCase} from '../util';
 
 import {AST} from 'angular2/change_detection';
 import {ProtoViewBuilder, ElementBinderBuilder} from '../view/proto_view_builder';

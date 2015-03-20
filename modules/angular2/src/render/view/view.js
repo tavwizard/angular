@@ -4,13 +4,13 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 import {Promise} from 'angular2/src/facade/async';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
+import {reflector} from 'angular2/src/reflection/reflection';
 
 import {ViewContainer} from './view_container';
 import {ProtoView} from './proto_view';
 import {LightDom} from '../shadow_dom/emulation/light_dom';
 import {Content} from '../shadow_dom/emulation/content_tag';
-import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
-import {EventManager} from '../events/event_manager';
+import {ViewServices} from './view_services';
 
 const NG_BINDING_CLASS = 'ng-binding';
 
@@ -30,14 +30,13 @@ export class View extends api.View {
   contentTags: List<Content>;
   lightDoms: List<LightDom>;
   proto: ProtoView;
-  _eventManager: EventManager;
-  _shadowDomStrategy:ShadowDomStrategy;
+  _viewServices: ViewServices;
   _hydrated: boolean;
 
   constructor(
-      proto:ProtoView, rootNodes:List, eventManager:EventManager,
-      shadowDomStrategy:ShadowDomStrategy,
+      viewServices: ViewServices, proto:ProtoView, rootNodes:List,
       boundTextNodes: List, boundElements:List, viewContainers:List, contentTags:List) {
+    this._viewServices = viewServices;
     this.proto = proto;
     this.rootNodes = rootNodes;
     this.boundTextNodes = boundTextNodes;
@@ -46,18 +45,15 @@ export class View extends api.View {
     this.contentTags = contentTags;
     this.lightDoms = ListWrapper.createFixedSize(boundElements.length);
     this.componentChildViews = ListWrapper.createFixedSize(boundElements.length);
-    this._eventManager = eventManager;
     this._hydrated = false;
-    this._shadowDomStrategy = shadowDomStrategy;
   }
 
   hydrated() {
     return this._hydrated;
   }
 
-  // TODO: don't use the setter
-  setElementProperty(elementIndex:number, propertyName:string, setter:Function, value:Object) {
-    setter(this.boundElements[elementIndex], value);
+  setElementProperty(elementIndex:number, propertyName:string, value:Object) {
+    this._viewServices.propertyAccessor.setProperty(this.boundElements[elementIndex], propertyName, value);
   }
 
   setText(textIndex:number, value:string) {
@@ -65,14 +61,14 @@ export class View extends api.View {
   }
 
   listen(elementIndex:number, eventName:string, callback:Function) {
-    this._eventManager(this.boundElements[elementIndex], eventName, callback);
+    this._viewServices.eventManager(this.boundElements[elementIndex], eventName, callback);
   }
 
   setComponentView(elementIndex:number, childView:View) {
     var element = this.boundElements[elementIndex];
-
-    var lightDom = this._shadowDomStrategy.constructLightDom(this, childView, element);
-    this._shadowDomStrategy.attachTemplate(element, childView);
+    var strategy = this._viewServices.shadowDomStrategy;
+    var lightDom = strategy.constructLightDom(this, childView, element);
+    strategy.attachTemplate(element, childView);
     this.lightDoms[elementIndex] = lightDom;
     this.componentChildViews[elementIndex] = childView;
     if (this._hydrated) {

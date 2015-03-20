@@ -11,7 +11,8 @@ import {EventManager} from '../events/event_manager';
 import {ViewContainer} from './view_container';
 import {ProtoView} from './proto_view';
 import {View} from './view';
-import {NG_BINDING_CLASS_SELECTOR, NG_BINDING_CLASS} from './util';
+import {ViewServices} from './view_services';
+import {NG_BINDING_CLASS_SELECTOR, NG_BINDING_CLASS} from '../util';
 
 import {ProtoViewBuilder} from './proto_view_builder';
 
@@ -22,13 +23,12 @@ export class ViewFactory {
   _poolCapacity:number;
   _pooledViews:List<View>;
   _eventManager:EventManager;
-  _shadowDomStrategy:ShadowDomStrategy;
+  _viewServices:ViewServices;
 
-  constructor(capacity, eventManager, shadowDomStrategy) {
+  constructor(capacity, viewServices) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
-    this._eventManager = eventManager;
-    this._shadowDomStrategy = shadowDomStrategy;
+    this._viewServices = viewServices;
   }
 
   getView(protoView:ProtoView): View {
@@ -47,7 +47,7 @@ export class ViewFactory {
     var element = elementOrSelector; // TODO: select the element if it is not a real element...
     var rootProtoViewBuilder = new ProtoViewBuilder(element);
     rootProtoViewBuilder.bindElement(element, 'root element');
-    this._shadowDomStrategy.shimAppElement(element);
+    this._viewServices.shadowDomStrategy.shimAppElement(element);
     return this.getView(rootProtoViewBuilder.build());
   }
 
@@ -133,7 +133,7 @@ export class ViewFactory {
     }
 
     var view = new View(
-      protoView, viewRootNodes, this._eventManager, this._shadowDomStrategy,
+      this._viewServices, protoView, viewRootNodes,
       boundTextNodes, boundElements, viewContainers, contentTags
     );
 

@@ -49,9 +49,7 @@ export class ProtoView {
 }
 
 export class View {
-  // TODOz: remove setter
-  setElementProperty(boundElementIndex:number,
-    propertyName:string, setter:Function, propertyValue:any):void {}
+  setElementProperty(boundElementIndex:number, propertyName:string, propertyValue:any):void {}
 
   setComponentView(boundElementIndex:number, view:View):void {}
 

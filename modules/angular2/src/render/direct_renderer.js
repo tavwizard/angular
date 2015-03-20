@@ -8,16 +8,11 @@ import {ShadowDomStrategy} from './shadow_dom/shadow_dom_strategy';
 
 export class DirectRenderer extends Renderer {
   _compiler: Compiler;
-  _eventManager: EventManager;
-  _shadowDomStrategy: ShadowDomStrategy;
   _viewFactory: ViewFactory;
 
   constructor(
-      compiler: Compiler, eventManager: EventManager,
-      shadowDomStrategy: ShadowDomStrategy, viewFactory: ViewFactory) {
+      compiler: Compiler, viewFactory: ViewFactory) {
     this._compiler = compiler;
-    this._eventManager = eventManager;
-    this._shadowDomStrategy = shadowDomStrategy;
     this._viewFactory = viewFactory;
   }
 

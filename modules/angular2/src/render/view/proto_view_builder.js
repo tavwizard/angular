@@ -6,7 +6,7 @@ import {ProtoView} from './proto_view';
 import {ElementBinder} from './element_binder';
 import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
 
-import {NG_BINDING_CLASS} from './util';
+import {NG_BINDING_CLASS} from '../util';
 
 export class ProtoViewBuilder {
   rootElement;

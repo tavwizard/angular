@@ -1,6 +1,6 @@
 import {Promise} from 'angular2/src/facade/async';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
-import {Locals, ChangeDispatcher, ProtoChangeDetector} from 'angular2/change_detection';
+import {Locals, ChangeDispatcher, ProtoChangeDetector, ChangeRecord} from 'angular2/change_detection';
 
 import {ProtoElementInjector, DirectiveBinding} from './element_injector';
 import {ElementBinder} from './element_binder';
@@ -121,15 +121,13 @@ export class ProtoView {
 export class ElementBindingMemento {
   _elementIndex:int;
   _setterName:string;
-  _setter:SetterFn;
-  constructor(elementIndex:int, setterName:string, setter:SetterFn) {
+  constructor(elementIndex:int, setterName:string) {
     this._elementIndex = elementIndex;
     this._setterName = setterName;
-    this._setter = setter;
   }
 
   invoke(record:ChangeRecord, renderView:renderApi.View) {
-    renderView.setElementProperty(this._elementIndex, this._setterName, this._setter, record.currentValue);
+    renderView.setElementProperty(this._elementIndex, this._setterName, record.currentValue);
   }
 }
 
