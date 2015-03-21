@@ -1,8 +1,10 @@
 import {Promise} from 'angular2/src/facade/async';
+import {SetterFn} from 'angular2/src/reflection/types';
+
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 import {Locals, ChangeDispatcher, ProtoChangeDetector, ChangeRecord} from 'angular2/change_detection';
 
-import {ProtoElementInjector, DirectiveBinding} from './element_injector';
+import {ProtoElementInjector, DirectiveBinding, ElementInjector} from './element_injector';
 import {ElementBinder} from './element_binder';
 import {DirectiveMetadata} from './directive_metadata';
 import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';

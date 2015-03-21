@@ -1,16 +1,22 @@
-import {isPresent} from 'angular2/src/facade/lang';
+import {isPresent, isBlank} from 'angular2/src/facade/lang';
 import {List, ListWrapper, Map, MapWrapper} from 'angular2/src/facade/collection';
 import {AST, ChangeDetection, BindingRecord, Parser} from 'angular2/change_detection';
 
 import {ElementBinder} from './element_binder';
-import {ProtoView, ElementBindingMemento} from './proto_view';
-import {ProtoElementInjector, ComponentKeyMetaData, DirectiveBinding} from './element_injector';
+import {ProtoView, ElementBindingMemento, DirectiveBindingMemento} from './proto_view';
+import {
+  ProtoElementInjector, ComponentKeyMetaData, DirectiveBinding
+} from './element_injector';
+import {DirectiveMetadata} from './directive_metadata';
+import {Component, DynamicComponent, Viewport} from '../annotations/annotations';
+import {reflector} from 'angular2/src/reflection/reflection';
 
 import * as renderApi from 'angular2/render_api';
 
 export class ProtoViewBuilder {
   _changeDetection: ChangeDetection;
   _parser: Parser;
+  _componentDirectives: List<DirectiveMetadata>;
   _renderProtoView: renderApi.ProtoView;
   _eventHandlers: List;
   _bindingRecords: List;
@@ -26,8 +32,17 @@ export class ProtoViewBuilder {
     this._parser = parser;
   }
 
-  init(renderProtoView: renderApi.ProtoView):ProtoViewBuilder {
+  setRenderProtoView(renderProtoView) {
     this._renderProtoView = renderProtoView;
+    return this;
+  }
+
+  setComponentDirectives(directives:List<DirectiveMetadata>) {
+    this._componentDirectives = directives;
+    return this;
+  }
+
+  build():ProtoView {
     this._eventHandlers = [];
     this._bindingRecords = [];
     this._elementBinders = [];
@@ -36,10 +51,7 @@ export class ProtoViewBuilder {
     this._variableBindings = ListWrapper.create(); // TODO
     this._protoLocals = MapWrapper.create(); // TODO
     this._textNodesWithBindingCount = 0;
-    return this;
-  }
 
-  build():ProtoView {
     ListWrapper.forEach(this._renderProtoView.elementBinders, (renderElementBinder) => {
       this._processElementBinder(renderElementBinder);
     });
@@ -61,11 +73,11 @@ export class ProtoViewBuilder {
     var allDirectives = [];
     ListWrapper.forEach(renderElementBinder.directives, (renderDirective) => {
       var directive = this._resolveDirective(renderDirective);
-      if (directive.annotation instanceof Component) {
+      if (directive.annotation instanceof Component || directive.annotation instanceof DynamicComponent) {
         componentDirective = directive;
         // componentDirective needs to be first, so don't
         // add it immediately to the allDirectives array
-      } else if (directive.annotation instanceof Template) {
+      } else if (directive.annotation instanceof Viewport) {
         viewportDirective = directive;
         ListWrapper.push(allDirectives, directive);
       } else {
@@ -79,11 +91,14 @@ export class ProtoViewBuilder {
 
     var protoElementInjector = this._createProtoElementInjector(
       renderElementBinder,
-      allDirectives
+      allDirectives,
+      isPresent(componentDirective)
     );
     this._processTextBindings(renderElementBinder);
-    this._processPropertyBindings(renderElementBinder);
-    this._processPropertyInterpolations(renderElementBinder);
+    var propertyBindingAsts = MapWrapper.create();
+    this._processPropertyBindings(renderElementBinder, propertyBindingAsts);
+    this._processPropertyInterpolations(renderElementBinder, propertyBindingAsts);
+    this._processDirectivePropertyBindings(allDirectives, renderElementBinder, propertyBindingAsts);
 
     var events = null; // TODO
 
@@ -91,7 +106,9 @@ export class ProtoViewBuilder {
     if (isPresent(renderElementBinder.nestedProtoView)) {
       nestedProtoView = new ProtoViewBuilder(
         this._changeDetection, this._parser
-      ).init(renderElementBinder.nestedProtoView).build();
+      ).setComponentDirectives(this._componentDirectives)
+       .setRenderProtoView(renderElementBinder.nestedProtoView)
+       .build();
     }
     ListWrapper.push(this._elementBinders, new ElementBinder(
       protoElementInjector,
@@ -110,23 +127,55 @@ export class ProtoViewBuilder {
     });
   }
 
-  _processPropertyBindings(renderElementBinder) {
+  _processPropertyBindings(renderElementBinder, propertyBindingAsts) {
     MapWrapper.forEach(renderElementBinder.propertyBindings, (expressionStr, propertyName) => {
       var expression = this._parser.parseBinding(expressionStr, renderElementBinder.elementDescription);
+      MapWrapper.set(propertyBindingAsts, propertyName, expression);
       var memento = new ElementBindingMemento(renderElementBinder.index, propertyName);
       ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
     });
   }
 
-  _processPropertyInterpolations(renderElementBinder) {
+  _processPropertyInterpolations(renderElementBinder, propertyBindingAsts) {
     MapWrapper.forEach(renderElementBinder.propertyInterpolations, (expressionStr, propertyName) => {
       var expression = this._parser.parseInterpolation(expressionStr, renderElementBinder.elementDescription);
+      MapWrapper.set(propertyBindingAsts, propertyName, expression);
       var memento = new ElementBindingMemento(renderElementBinder.index, propertyName);
       ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));
     });
   }
 
-  _createProtoElementInjector(renderElementBinder, allDirectives) {
+  _processDirectivePropertyBindings(allDirectives, renderElementBinder, propertyBindingAsts) {
+    for (var i=0; i<allDirectives.length; i++) {
+      var directive = allDirectives[i];
+      var bind = directive.annotation.bind;
+      if (isPresent(bind)) {
+        MapWrapper.forEach(bind, (bindConfig, dirProp) => {
+          var pipes = this._splitBindConfig(bindConfig);
+          var elProp = ListWrapper.removeAt(pipes, 0);
+
+          var bindingAst = MapWrapper.get(propertyBindingAsts, elProp);
+          if (isBlank(bindingAst)) {
+            var attributeValue = MapWrapper.get(renderElementBinder.initAttrs, elProp);
+            if (isPresent(attributeValue)) {
+              bindingAst = this._parser.wrapLiteralPrimitive(attributeValue, renderElementBinder.elementDescription);
+            }
+          }
+
+          // Bindings are optional, so this binding only needs to be set up if an expression is given.
+          if (isPresent(bindingAst)) {
+            var fullExpAstWithBindPipes = this._parser.addPipes(bindingAst, pipes);
+            var memento = new DirectiveBindingMemento(
+              renderElementBinder.index, i, dirProp, reflector.setter(dirProp)
+            );
+            ListWrapper.push(this._bindingRecords, new BindingRecord(fullExpAstWithBindPipes, memento, null));
+          }
+        });
+      }
+    }
+  }
+
+  _createProtoElementInjector(renderElementBinder, allDirectives, hasComponentDirective) {
     var protoElementInjector = null;
     var parentProtoElementInjector = null;
     var distanceToParentElementInjector;
@@ -149,8 +198,8 @@ export class ProtoViewBuilder {
       protoElementInjector = new ProtoElementInjector(
         parentProtoElementInjector,
         renderElementBinder.index,
-        directives.map(this._createDirectiveBinding),
-        isPresent(componentDirective),
+        ListWrapper.map(allDirectives, this._createDirectiveBinding),
+        hasComponentDirective,
         distanceToParentElementInjector
       );
       inheritedProtoElementInjector = protoElementInjector;
@@ -161,14 +210,16 @@ export class ProtoViewBuilder {
     return protoElementInjector;
   }
 
+  _splitBindConfig(bindConfig:string) {
+    return ListWrapper.map(bindConfig.split('|'), (s) => s.trim());
+  }
+
   _createDirectiveBinding(d:DirectiveMetadata): DirectiveBinding {
     return DirectiveBinding.createFromType(d.type, d.annotation);
   }
 
   _resolveDirective(directive:renderApi.DirectiveMetadata):DirectiveMetadata {
-    // TODOz: really resolve the DirectiveMetadata for the case that it is
-    // not the real DirectiveMetadata
-    return directive;
+    return this._componentDirectives[directive.index];
   }
 
 }

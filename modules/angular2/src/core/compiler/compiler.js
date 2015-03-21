@@ -6,7 +6,7 @@ import {DirectiveMetadataReader} from './directive_metadata_reader';
 import {ProtoView} from './proto_view';
 import {ElementBinder} from './element_binder';
 import {TemplateResolver} from './template_resolver';
-import {Component} from '../annotations/annotations';
+import {Component, DynamicComponent} from '../annotations/annotations';
 import {Template} from '../annotations/template';
 import {ComponentUrlMapper} from './component_url_mapper';
 import {UrlResolver} from 'angular2/src/services/url_resolver';
@@ -128,26 +128,36 @@ export class Compiler {
       templateAbsUrl = this._urlResolver.resolve(baseUrl, template.url);
     }
 
+    var directives = this._flattenDirectives(template);
+    var renderDirectives = [];
+    for (var i=0; i<directives.length; i++) {
+      var directive = directives[i];
+      ListWrapper.push(renderDirectives, new renderApi.DirectiveMetadata(
+        i,
+        directive.annotation.selector,
+        (directive.annotation instanceof Component || directive.annotation instanceof DynamicComponent)
+      ));
+    }
     var renderTemplate = new renderApi.Template({
       id: stringify(component),
       absUrl: templateAbsUrl,
       inline: template.inline,
-      directives: ListWrapper.map(
-        this._flattenDirectives(template),
-        (d) => this._reader.read(d)
-      )
+      directives: renderDirectives
     });
 
     var renderProtoView = this._renderer.compile(renderTemplate);
     if (PromiseWrapper.isPromise(renderProtoView)) {
-      return renderProtoView.then( (rpv) => this._createProtoView(rpv, component) );
+      return renderProtoView.then( (rpv) => this._createProtoView(rpv, component, directives) );
     } else {
-      return this._createProtoView(renderProtoView, component);
+      return this._createProtoView(renderProtoView, component, directives);
     }
   }
 
-  _createProtoView(renderProtoView: renderApi.ProtoView, component: Type) {
-    var protoView = new ProtoViewBuilder(this._changeDetection, this._parser).init(renderProtoView).build();
+  _createProtoView(renderProtoView: renderApi.ProtoView, component: Type, directives: List<DirectiveMetadata>) {
+    var protoView = new ProtoViewBuilder(this._changeDetection, this._parser)
+      .setComponentDirectives(directives)
+      .setRenderProtoView(renderProtoView)
+      .build();
     if (PromiseWrapper.isPromise(protoView)) {
       return protoView.then( (pv) => this._compileNestedProtoViews(pv) );
     } else {
@@ -192,8 +202,10 @@ export class Compiler {
 
     var directives = [];
     this._flattenList(template.directives, directives);
-
-    return directives;
+    return ListWrapper.map(
+      directives,
+      (d) => this._reader.read(d)
+    );
   }
 
   _flattenList(tree:List<any>, out:List<Type>) {

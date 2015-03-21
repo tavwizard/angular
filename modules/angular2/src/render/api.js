@@ -92,8 +92,14 @@ export class Template {
 }
 
 export class DirectiveMetadata {
+  index:number;
   selector:string;
   isComponent:boolean;
+  constructor(index, selector, isComponent) {
+    this.index = index;
+    this.selector = selector;
+    this.isComponent = isComponent;
+  }
 }
 
 export class Renderer {

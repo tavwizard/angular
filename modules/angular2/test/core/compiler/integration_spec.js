@@ -199,7 +199,7 @@ export function main() {
         });
       }));
 
-      iit('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
+      it('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div inner-html="{{ctxProp}}"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {
@@ -217,7 +217,7 @@ export function main() {
         });
       }));
 
-      it('should consume directive watch expression change.', inject([AsyncTestCompleter], (async) => {
+      iit('should consume directive watch expression change.', inject([AsyncTestCompleter], (async) => {
         var tpl =
           '<div>' +
             '<div my-dir [elprop]="ctxProp"></div>' +
