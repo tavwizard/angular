@@ -9,7 +9,7 @@ import {CompileControl} from '../compiler/compile_control';
 
 import {ShadowDomStrategy} from './shadow_dom_strategy';
 
-import {Template, DirectiveMetadata} from '../api';
+import {Template} from '../api';
 
 /**
  * Processes the <style> tags during the compilation:

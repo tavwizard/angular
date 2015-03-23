@@ -33,7 +33,7 @@ export class Compiler {
       this._cssProcessor.getCompileStep(template, this._shadowDomStrategy, stylePromises),
       this._shadowDomStrategy.getTemplateCompileStep(template),
       new PropertyBindingParser(this._parser),
-      new DirectiveParser(template.directives),
+      new DirectiveParser(template.directiveSelectors),
       new TextInterpolationParser(),
       new ElementBinderInheriter()
     ];
@@ -66,7 +66,7 @@ export class Compiler {
     //   return PromiseWrapper.reject(ex);
     // }
 
-    var protoView = compileElements[0].inheritedProtoView.build();
+    var protoView = compileElements[0].inheritedProtoView.setComponentId(template.id).build();
 
     if (stylePromises.length > 0) {
       // The protoView is ready after all asynchronous styles are ready

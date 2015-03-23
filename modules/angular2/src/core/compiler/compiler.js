@@ -129,20 +129,16 @@ export class Compiler {
     }
 
     var directives = this._flattenDirectives(template);
-    var renderDirectives = [];
+    var directiveSelectors = [];
     for (var i=0; i<directives.length; i++) {
       var directive = directives[i];
-      ListWrapper.push(renderDirectives, new renderApi.DirectiveMetadata(
-        i,
-        directive.annotation.selector,
-        (directive.annotation instanceof Component || directive.annotation instanceof DynamicComponent)
-      ));
+      ListWrapper.push(directiveSelectors, directive.annotation.selector);
     }
     var renderTemplate = new renderApi.Template({
       id: stringify(component),
       absUrl: templateAbsUrl,
       inline: template.inline,
-      directives: renderDirectives
+      directiveSelectors: directiveSelectors
     });
 
     var renderProtoView = this._renderer.compile(renderTemplate);

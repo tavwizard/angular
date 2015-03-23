@@ -52,18 +52,6 @@ export class ShadowDomStrategy {
    * @returns {CompileStep} a compile step to append to the compiler pipeline
    */
   getTemplateCompileStep(template: Template): NS.CompileStep { return _emptyStep(); }
-
-  /**
-   * The application element does not go through the compiler pipeline.
-   *
-   * This methods is called when the root ProtoView is created and to optionnaly update the
-   * application root element.
-   *
-   * @see ViewFactory.createRootView
-   *
-   * @param element
-   */
-  shimAppElement(element) {}
 }
 
 /**
@@ -124,6 +112,13 @@ export class EmulatedScopedShadowDomStrategy extends EmulatedUnscopedShadowDomSt
     this._styleInliner = styleInliner;
   }
 
+  attachTemplate(el, view:viewModule.View) {
+    super.attachTemplate(el, view);
+
+    var hostAttribute = _getHostAttribute(_getComponentId(view.proto.componentId));
+    DOM.setAttribute(element, hostAttribute, '');
+  }
+
   getStyleCompileStep(template: Template, stylePromises: List<Promise>): NS.CompileStep {
     return new _EmulatedScopedCssStep(template, this._styleInliner,
       this._styleUrlResolver, this._styleHost, stylePromises);
@@ -131,11 +126,6 @@ export class EmulatedScopedShadowDomStrategy extends EmulatedUnscopedShadowDomSt
 
   getTemplateCompileStep(template: Template): NS.CompileStep {
     return new _ShimShadowDomStep(template);
-  }
-
-  shimAppElement(element) {
-    var hostAttribute = _getHostAttribute(_createAppId());
-    DOM.setAttribute(element, hostAttribute, '');
   }
 }
 
@@ -200,8 +190,7 @@ class _ShimShadowDomStep extends _BaseEmulatedShadowDomStep {
 
   constructor(template: Template) {
     super();
-    var id = _getComponentId(template);
-    this._contentAttribute = _getContentAttribute(id);
+    this._contentAttribute = _getContentAttribute(_getComponentId(template.id));
   }
 
 
@@ -213,14 +202,6 @@ class _ShimShadowDomStep extends _BaseEmulatedShadowDomStep {
 
     // Shim the element as a child of the compiled component
     DOM.setAttribute(current.element, this._contentAttribute, '');
-
-    // If the current element is also a component, shim it as a host
-    var host = current.injeritedElementBinder.isComponentDirective();
-    if (isPresent(host)) {
-      var hostId = _getComponentId(template);
-      var hostAttribute = _getHostAttribute(hostId);
-      DOM.setAttribute(current.element, hostAttribute, '');
-    }
   }
 }
 
@@ -282,11 +263,11 @@ class _EmulatedScopedCssStep extends NS.CompileStep {
       DOM.setText(styleEl, '');
       ListWrapper.push(this._stylePromises, css);
       return css.then((css) => {
-        css = _shimCssForComponent(css, this._template);
+        css = _shimCssForComponent(css, this._template.id);
         DOM.setText(styleEl, css);
       });
     } else {
-      css = _shimCssForComponent(css, this._template);
+      css = _shimCssForComponent(css, this._template.id);
       DOM.setText(styleEl, css);
     }
 
@@ -324,11 +305,7 @@ var _nextComponentUID: int = 0;
 var _sharedStyleTexts: Map<string, boolean> = MapWrapper.create();
 var _lastInsertedStyleEl;
 
-function _createAppId() {
-  return _nextComponentUID++;
-}
-
-function _getComponentId(template: Template) {
+function _getComponentId(componentStringId: string) {
   var id = MapWrapper.get(_componentUIDs, template.id);
   if (isBlank(id)) {
     id = _nextComponentUID++;
@@ -361,8 +338,8 @@ function _getContentAttribute(id: int) {
   return `_ngcontent-${id}`;
 }
 
-function _shimCssForComponent(cssText: string, template: Template): string {
-  var id = _getComponentId(template);
+function _shimCssForComponent(cssText: string, componentId: string): string {
+  var id = _getComponentId(componentId);
   var shadowCss = new ShadowCss();
   return shadowCss.shimCssText(cssText, _getContentAttribute(id), _getHostAttribute(id));
 }

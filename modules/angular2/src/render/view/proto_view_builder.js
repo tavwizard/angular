@@ -15,12 +15,14 @@ export class ProtoViewBuilder {
   variableBindings: Map<string, string>;
   elements:List<ElementBinderBuilder>;
   instantiateInPlace:boolean;
+  componentId:string;
 
   constructor(rootElement) {
     this.rootElement = rootElement;
     this.elements = [];
     this.instantiateInPlace = false;
     this.variableBindings = MapWrapper.create();
+    this.componentId = null;
   }
 
   bindElement(element, description = null):ElementBinderBuilder {
@@ -39,6 +41,11 @@ export class ProtoViewBuilder {
     this.instantiateInPlace = value;
   }
 
+  setComponentId(componentId) {
+    this.componentId = componentId;
+    return this;
+  }
+
   build():api.ProtoView {
     var renderElementBinders = [];
 
@@ -51,7 +58,7 @@ export class ProtoViewBuilder {
       ListWrapper.push(apiElementBinders, new api.ElementBinder({
         index: ebb.index, parentIndex:parentIndex, distanceToParent:ebb.distanceToParent,
         parentWithDirectivesIndex: parentWithDirectivesIndex, distanceToParentWithDirectives: ebb.distanceToParentWithDirectives,
-        directives: ebb.directives,
+        directiveIndices: ebb.directiveIndices,
         nestedProtoView: nestedProtoView,
         elementDescription: ebb.elementDescription, initAttrs: ebb.initAttrs,
         propertyBindings: ebb.propertyBindings, variableBindings: ebb.variableBindings,
@@ -68,7 +75,8 @@ export class ProtoViewBuilder {
       render: new ProtoView({
         element: this.rootElement,
         elementBinders: renderElementBinders,
-        instantiateInPlace: instantiateInPlace
+        instantiateInPlace: instantiateInPlace,
+        componentId: this.componentId
       }),
       elementBinders: apiElementBinders,
       variableBindings: this.variableBindings
@@ -83,7 +91,7 @@ export class ElementBinderBuilder {
   distanceToParent:number;
   parentWithDirectives:ElementBinderBuilder;
   distanceToParentWithDirectives:number;
-  directives:List<api.DirectiveMetadata>;
+  directiveIndices:List<number>;
   nestedProtoView:ProtoViewBuilder;
   elementDescription:string;
   // attributes of the element that are not part of bindings.
@@ -106,7 +114,7 @@ export class ElementBinderBuilder {
     this.distanceToParent = 0;
     this.parentWithDirectives = null;
     this.distanceToParentWithDirectives = 0;
-    this.directives = [];
+    this.directiveIndices = [];
     this.nestedProtoView = null;
     this.elementDescription = description;
     this.initAttrs = MapWrapper.create();
@@ -136,8 +144,8 @@ export class ElementBinderBuilder {
     return this;
   }
 
-  addDirective(directive:api.DirectiveMetadata) {
-    ListWrapper.push(this.directives, directive);
+  addDirective(directiveIndex:number) {
+    ListWrapper.push(this.directiveIndices, directiveIndex);
   }
 
   bindNestedProtoView():ProtoViewBuilder {

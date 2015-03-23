@@ -11,15 +11,18 @@ export class ProtoView extends api.ProtoViewRef {
   isTemplateElement:boolean;
   instantiateInPlace:boolean;
   rootBindingOffset:int;
+  componentId:string;
 
   constructor({
     elementBinders,
-    element, instantiateInPlace
+    element, instantiateInPlace,
+    componentId
   }) {
     this.element = element;
     this.elementBinders = elementBinders;
     this.isTemplateElement = DOM.isTemplateElement(this.element);
     this.instantiateInPlace = instantiateInPlace;
     this.rootBindingOffset = (isPresent(this.element) && DOM.hasClass(this.element, NG_BINDING_CLASS)) ? 1 : 0;
+    this.componentId = componentId;
   }
 }

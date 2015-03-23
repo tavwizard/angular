@@ -6,7 +6,7 @@ export class ElementBinder {
   distanceToParent:number;
   parentWithDirectivesIndex:number;
   distanceToParentWithDirectives:number;
-  directives:List<DirectiveMetadata>;
+  directiveIndices:List<number>;
   nestedProtoView:ProtoView;
   elementDescription:string;
   // attributes of the element that are not part of bindings.
@@ -22,7 +22,7 @@ export class ElementBinder {
 
   constructor({
     index, parentIndex, distanceToParent, parentWithDirectivesIndex,
-    distanceToParentWithDirectives, directives, nestedProtoView,
+    distanceToParentWithDirectives, directiveIndices, nestedProtoView,
     elementDescription, initAttrs, propertyBindings, variableBindings,
     eventBindings, propertyInterpolations, textBindings
   }) {
@@ -31,7 +31,7 @@ export class ElementBinder {
     this.distanceToParent = distanceToParent;
     this.parentWithDirectivesIndex = parentWithDirectivesIndex;
     this.distanceToParentWithDirectives = distanceToParentWithDirectives;
-    this.directives = directives;
+    this.directiveIndices = directiveIndices;
     this.nestedProtoView = nestedProtoView;
     this.elementDescription = elementDescription;
     this.initAttrs = initAttrs;
@@ -74,23 +74,12 @@ export class Template {
   id: string;
   absUrl: string;
   inline: string;
-  directives: List<DirectiveMetadata>;
-  constructor({id, absUrl, inline, directives}) {
+  directiveSelectors: List<string>;
+  constructor({id, absUrl, inline, directiveSelectors}) {
     this.id = id;
     this.absUrl = absUrl;
     this.inline = inline;
-    this.directives = directives;
-  }
-}
-
-export class DirectiveMetadata {
-  index:number;
-  selector:string;
-  isComponent:boolean;
-  constructor(index, selector, isComponent) {
-    this.index = index;
-    this.selector = selector;
-    this.isComponent = isComponent;
+    this.directiveSelectors = directiveSelectors;
   }
 }
 

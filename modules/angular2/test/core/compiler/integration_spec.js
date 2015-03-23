@@ -78,10 +78,7 @@ export function main() {
       );
 
       var eventManager = null;
-      var renderViewFactory = new renderViewFactoryModule.ViewFactory(
-        1,
-        shadowDomStrategy
-      );
+      var renderViewFactory = new renderViewFactoryModule.ViewFactory(1);
 
       renderer = new DirectRenderer(
         renderCompiler,

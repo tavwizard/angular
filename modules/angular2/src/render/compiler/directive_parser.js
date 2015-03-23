@@ -3,7 +3,6 @@ import {List, MapWrapper, StringMapWrapper} from 'angular2/src/facade/collection
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {SelectorMatcher, CssSelector} from './selector';
 
-import {DirectiveMetadata} from '../api';
 import {CompileStep} from './compile_step';
 import {CompileElement} from './compile_element';
 import {CompileControl} from './compile_control';
@@ -14,13 +13,12 @@ import {CompileControl} from './compile_control';
  */
 export class DirectiveParser extends CompileStep {
   _selectorMatcher:SelectorMatcher;
-  constructor(directives:List<DirectiveMetadata>) {
+  constructor(directiveSelectors:List<string>) {
     super();
     this._selectorMatcher = new SelectorMatcher();
-    for (var i=0; i<directives.length; i++) {
-      var directiveMetadata = directives[i];
-      var selector = CssSelector.parse(directiveMetadata.selector);
-      this._selectorMatcher.addSelectable(selector, directiveMetadata);
+    for (var i=0; i<directiveSelectors.length; i++) {
+      var selector = CssSelector.parse(directiveSelectors[i]);
+      this._selectorMatcher.addSelectable(selector, i);
     }
   }
 
@@ -43,8 +41,8 @@ export class DirectiveParser extends CompileStep {
     // only be present on <template> elements any more!
     var isTemplateElement = DOM.isTemplateElement(current.element);
 
-    this._selectorMatcher.match(cssSelector, (selector, directive) => {
-      current.bindElement().addDirective(directive);
+    this._selectorMatcher.match(cssSelector, (selector, directiveIndex) => {
+      current.bindElement().addDirective(directiveIndex);
     });
   }
 }

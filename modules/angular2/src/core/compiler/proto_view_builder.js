@@ -67,8 +67,8 @@ export class ProtoViewBuilder {
     var componentDirective = null;
     var viewportDirective = null;
     var allDirectives = [];
-    ListWrapper.forEach(renderElementBinder.directives, (renderDirective) => {
-      var directive = this._resolveDirective(renderDirective);
+    ListWrapper.forEach(renderElementBinder.directiveIndices, (directiveIndex) => {
+      var directive = this._componentDirectives[directiveIndex];
       if (directive.annotation instanceof Component || directive.annotation instanceof DynamicComponent) {
         componentDirective = directive;
         // componentDirective needs to be first, so don't
@@ -201,10 +201,6 @@ export class ProtoViewBuilder {
 
   _createDirectiveBinding(d:DirectiveMetadata): DirectiveBinding {
     return DirectiveBinding.createFromType(d.type, d.annotation);
-  }
-
-  _resolveDirective(directive:renderApi.DirectiveMetadata):DirectiveMetadata {
-    return this._componentDirectives[directive.index];
   }
 
 }

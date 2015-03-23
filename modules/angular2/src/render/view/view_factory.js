@@ -21,12 +21,10 @@ export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
 export class ViewFactory {
   _poolCapacity:number;
   _pooledViews:List<View>;
-  _shadowDomStrategy:ShadowDomStrategy;
 
-  constructor(capacity, shadowDomStrategy) {
+  constructor(capacity) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
-    this._shadowDomStrategy = shadowDomStrategy;
   }
 
   getView(protoView:ProtoView): View {
@@ -46,7 +44,6 @@ export class ViewFactory {
     var rootProtoViewBuilder = new ProtoViewBuilder(element);
     rootProtoViewBuilder.setInstantiateInPlace(true);
     rootProtoViewBuilder.bindElement(element, 'root element');
-    this._shadowDomStrategy.shimAppElement(element);
     return this.getView(rootProtoViewBuilder.build().render);
   }
 
