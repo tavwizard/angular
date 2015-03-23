@@ -204,14 +204,3 @@ export class ProtoViewBuilder {
   }
 
 }
-
-class InheritedProtoElementInjector {
-  protoElementInjector:ProtoElementInjector;
-  distanceToParent:number;
-  constructor(
-      protoElementInjector:ProtoElementInjector,
-      distanceToParent:number) {
-    this.protoElementInjector = protoElementInjector;
-    this.distanceToParent = distanceToParent;
-  }
-}
