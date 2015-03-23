@@ -6,7 +6,7 @@ import {ProtoView} from './proto_view';
 import {ElementBinder} from './element_binder';
 import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
 
-import {DirectiveMetadata} from '../api';
+import * as api from '../api';
 
 import {NG_BINDING_CLASS} from '../util';
 
@@ -39,14 +39,16 @@ export class ProtoViewBuilder {
     this.instantiateInPlace = value;
   }
 
-  build():ProtoView {
-    var elementBinders = [];
+  build():api.ProtoView {
+    var renderElementBinders = [];
+
+    var apiElementBinders = [];
     ListWrapper.forEach(this.elements, (ebb) => {
       var nestedProtoView =
           isPresent(ebb.nestedProtoView) ? ebb.nestedProtoView.build() : null;
       var parentIndex = isPresent(ebb.parent) ? ebb.parent.index : -1;
       var parentWithDirectivesIndex = isPresent(ebb.parentWithDirectives) ? ebb.parentWithDirectives.index : -1;
-      var elBinder = new ElementBinder({
+      ListWrapper.push(apiElementBinders, new api.ElementBinder({
         index: ebb.index, parentIndex:parentIndex, distanceToParent:ebb.distanceToParent,
         parentWithDirectivesIndex: parentWithDirectivesIndex, distanceToParentWithDirectives: ebb.distanceToParentWithDirectives,
         directives: ebb.directives,
@@ -54,14 +56,22 @@ export class ProtoViewBuilder {
         elementDescription: ebb.elementDescription, initAttrs: ebb.initAttrs,
         propertyBindings: ebb.propertyBindings, variableBindings: ebb.variableBindings,
         eventBindings: ebb.eventBindings, propertyInterpolations: ebb.propertyInterpolations,
-        textBindings: ebb.textBindings, contentTagSelector: ebb.contentTagSelector
-      });
-      ListWrapper.push(elementBinders, elBinder);
+        textBindings: ebb.textBindings
+      }));
+      ListWrapper.push(renderElementBinders, new ElementBinder({
+        textNodeIndices: ebb.textBindingIndices,
+        contentTagSelector: ebb.contentTagSelector,
+        nestedProtoView: isPresent(nestedProtoView) ? nestedProtoView.render : null
+      }));
     });
-    return new ProtoView({
-      element: this.rootElement, elementBinders: elementBinders,
-      variableBindings: this.variableBindings,
-      instantiateInPlace: this.instantiateInPlace
+    return new api.ProtoView({
+      render: new ProtoView({
+        element: this.rootElement,
+        elementBinders: renderElementBinders,
+        instantiateInPlace: instantiateInPlace
+      }),
+      elementBinders: apiElementBinders,
+      variableBindings: this.variableBindings
     });
   }
 }
@@ -73,7 +83,7 @@ export class ElementBinderBuilder {
   distanceToParent:number;
   parentWithDirectives:ElementBinderBuilder;
   distanceToParentWithDirectives:number;
-  directives:List<DirectiveMetadata>;
+  directives:List<api.DirectiveMetadata>;
   nestedProtoView:ProtoViewBuilder;
   elementDescription:string;
   // attributes of the element that are not part of bindings.
@@ -85,7 +95,8 @@ export class ElementBinderBuilder {
   variableBindings: Map<string, string>;
   eventBindings: Map<string, string>;
   // Mapping from text node index to and interpolation expression
-  textBindings: Map<number, string>;
+  textBindingIndices: List<number>;
+  textBindings: List<string>;
   contentTagSelector:string;
 
   constructor(index, element, description) {
@@ -103,7 +114,8 @@ export class ElementBinderBuilder {
     this.propertyInterpolations = MapWrapper.create();
     this.variableBindings = MapWrapper.create();
     this.eventBindings = MapWrapper.create();
-    this.textBindings = MapWrapper.create();
+    this.textBindings = [];
+    this.textBindingIndices = [];
     this.contentTagSelector = null
   }
 
@@ -124,7 +136,7 @@ export class ElementBinderBuilder {
     return this;
   }
 
-  addDirective(directive:DirectiveMetadata) {
+  addDirective(directive:api.DirectiveMetadata) {
     ListWrapper.push(this.directives, directive);
   }
 
@@ -164,7 +176,8 @@ export class ElementBinderBuilder {
   }
 
   bindText(index, expression) {
-    MapWrapper.set(this.textBindings, index, expression);
+    ListWrapper.push(this.textBindingIndices, index);
+    ListWrapper.push(this.textBindings, expression);
   }
 
   setContentTagSelector(value:string) {

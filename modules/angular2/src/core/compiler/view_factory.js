@@ -79,8 +79,8 @@ export class ViewFactory {
     }
   }
 
-  _createView(renderView:renderApi.View, protoView:ProtoView): View {
-    var view = new View(renderView, protoView, protoView.protoLocals);
+  _createView(renderView:renderApi.ViewRef, protoView:ProtoView): View {
+    var view = new View(this._renderer, renderView, protoView, protoView.protoLocals);
     var changeDetector = protoView.protoChangeDetector.instantiate(view, protoView.bindingRecords, protoView.getVariableBindings());
     var binders = protoView.elementBinders;
     var elementInjectors = ListWrapper.createFixedSize(binders.length);
@@ -92,7 +92,6 @@ export class ViewFactory {
 
     for (var binderIdx = 0; binderIdx < binders.length; binderIdx++) {
       var binder = binders[binderIdx];
-      var element = renderView.boundElements[binderIdx];
       var elementInjector = null;
 
       // elementInjectors and rootElementInjectors
@@ -112,7 +111,7 @@ export class ViewFactory {
       var bindingPropagationConfig = null;
       if (isPresent(binder.nestedProtoView) && isPresent(binder.componentDirective)) {
         var childView = this.getView(binder.nestedProtoView);
-        renderView.setComponentView(binderIdx, childView.render);
+        this._renderer.setComponentView(renderView, binderIdx, childView.render);
         changeDetector.addChild(childView.changeDetector);
 
         bindingPropagationConfig = new BindingPropagationConfig(changeDetector);
@@ -133,6 +132,9 @@ export class ViewFactory {
 
       // preBuiltObjects
       if (isPresent(elementInjector)) {
+        // TODO(tbosch): We need to find another way for NgElement to change the element
+        // without actually referencing the element!
+        var element = renderView.boundElements[binderIdx];
         preBuiltObjects[binderIdx] = new PreBuiltObjects(this, view, new NgElement(element), viewContainer,
           bindingPropagationConfig);
       }

@@ -121,7 +121,7 @@ export function main() {
         view = rootView.componentChildViews[0];
       }
 
-      it('should consume text node changes', inject([AsyncTestCompleter], (async) => {
+      iit('should consume text node changes', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div>{{ctxProp}}</div>'}));
         compiler.compile(MyComp).then((pv) => {
           createView(pv);
@@ -133,7 +133,7 @@ export function main() {
         });
       }));
 
-      it('should consume element binding changes', inject([AsyncTestCompleter], (async) => {
+      iit('should consume element binding changes', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div [id]="ctxProp"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {
@@ -147,7 +147,7 @@ export function main() {
         });
       }));
 
-      it('should consume binding to aria-* attributes', inject([AsyncTestCompleter], (async) => {
+      iit('should consume binding to aria-* attributes', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div [aria-label]="ctxProp"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {
@@ -165,7 +165,7 @@ export function main() {
         });
       }));
 
-      it('should consume binding to property names where attr name and property name do not match', inject([AsyncTestCompleter], (async) => {
+      iit('should consume binding to property names where attr name and property name do not match', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div [tabindex]="ctxNumProp"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {
@@ -182,7 +182,7 @@ export function main() {
         });
       }));
 
-      it('should consume binding to camel-cased properties using dash-cased syntax in templates', inject([AsyncTestCompleter], (async) => {
+      iit('should consume binding to camel-cased properties using dash-cased syntax in templates', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<input [read-only]="ctxBoolProp">'}));
 
         compiler.compile(MyComp).then((pv) => {
@@ -199,7 +199,7 @@ export function main() {
         });
       }));
 
-      it('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
+      iit('should consume binding to inner-html', inject([AsyncTestCompleter], (async) => {
         tplResolver.setTemplate(MyComp, new Template({inline: '<div inner-html="{{ctxProp}}"></div>'}));
 
         compiler.compile(MyComp).then((pv) => {

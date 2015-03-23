@@ -13,12 +13,14 @@ export class PrivateComponentLocation {
   _elt:NgElement;
   _view:viewModule.View;
   _viewFactory:ViewFactory;
+  _renderer:Renderer;
 
-  constructor(viewFactory:ViewFactory, elementInjector:eiModule.ElementInjector, elt:NgElement, view:viewModule.View){
+  constructor(renderer: Renderer, viewFactory:ViewFactory, elementInjector:eiModule.ElementInjector, elt:NgElement, view:viewModule.View){
     this._elementInjector = elementInjector;
     this._elt = elt;
     this._view = view;
     this._viewFactory = viewFactory;
+    this._renderer = renderer;
   }
 
   createComponent(type:Type, annotation:Directive, componentProtoView:viewModule.ProtoView) {
@@ -26,7 +28,8 @@ export class PrivateComponentLocation {
 
     var view = this._viewFactory.getView(componentProtoView, this._elementInjector);
 
-    this._view.render.setComponentView(
+    this._renderer.setComponentView(
+      this._view.render,
       this._elementInjector.getElementBinderIndex(),
       view.render
     );

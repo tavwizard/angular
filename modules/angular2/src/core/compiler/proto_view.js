@@ -24,10 +24,10 @@ export class ProtoView {
   bindingRecords:List;
   parentProtoView:ProtoView;
   _variableBindings:List;
-  render:renderApi.ProtoView;
+  render:renderApi.ProtoViewRef;
 
   constructor(
-      protoRenderView: renderApi.ProtoView,
+      protoRenderView: renderApi.ProtoViewRef,
       protoChangeDetector:ProtoChangeDetector,
       elementBinders:List<ElementBinder>,
       eventHandlers:List,
@@ -128,8 +128,11 @@ export class ElementBindingMemento {
     this._setterName = setterName;
   }
 
-  invoke(record:ChangeRecord, renderView:renderApi.View) {
-    renderView.setElementProperty(this._elementIndex, this._setterName, record.currentValue);
+  invoke(record:ChangeRecord, renderView:renderApi.ViewRef, renderer:renderApi.Renderer) {
+    renderer.setElementProperty(
+      renderView, this._elementIndex,
+      this._setterName, record.currentValue
+    );
   }
 }
 

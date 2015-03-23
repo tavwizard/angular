@@ -8,7 +8,7 @@ import * as viewModule from './view';
 import * as ldModule from '../shadow_dom/emulation/light_dom';
 import * as vfModule from './view_factory';
 
-export class ViewContainer extends api.ViewContainer {
+export class ViewContainer {
   _viewFactory: vfModule.ViewFactory;
   templateElement;
   _views: List<viewModule.View>;

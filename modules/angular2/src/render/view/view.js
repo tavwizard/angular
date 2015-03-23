@@ -17,7 +17,7 @@ const NG_BINDING_CLASS = 'ng-binding';
 /**
  * Const of making objects: http://jsperf.com/instantiate-size-of-object
  */
-export class View extends api.View {
+export class View extends api.ViewRef {
   boundElements:List;
   boundTextNodes:List;
   /// When the view is part of render tree, the DocumentFragment is empty, which is why we need

@@ -32,9 +32,11 @@ export class View {
   proto: ProtoView;
   context: any;
   locals:Locals;
-  render:renderApi.View;
+  render:renderApi.ViewRef;
+  renderer:renderApi.Renderer;
 
-  constructor(renderView:renderApi.View, proto:ProtoView, protoLocals:Map) {
+  constructor(renderer: renderApi.Renderer, renderView:renderApi.ViewRef, proto:ProtoView, protoLocals:Map) {
+    this.renderer = renderer;
     this.render = renderView;
     this.proto = proto;
     this.changeDetector = null;
@@ -232,11 +234,11 @@ export class View {
 
     } else if (memento instanceof ElementBindingMemento) {
       var elementMemento:ElementBindingMemento = memento;
-      elementMemento.invoke(record, this.render);
+      elementMemento.invoke(record, this.render, this.renderer);
     } else {
       // we know it refers to _textNodes.
       var textNodeIndex:number = memento;
-      this.render.setText(textNodeIndex, record.currentValue);
+      this.renderer.setText(this.render, textNodeIndex, record.currentValue);
     }
   }
 

@@ -46,9 +46,10 @@ export class ViewFactory {
   getRootView(elementOrSelector) {
     var element = elementOrSelector; // TODO: select the element if it is not a real element...
     var rootProtoViewBuilder = new ProtoViewBuilder(element);
+    rootProtoViewBuilder.setInstantiateInPlace(true);
     rootProtoViewBuilder.bindElement(element, 'root element');
     this._viewServices.shadowDomStrategy.shimAppElement(element);
-    return this.getView(rootProtoViewBuilder.build());
+    return this.getView(rootProtoViewBuilder.build().render);
   }
 
   returnView(view:View) {
@@ -105,16 +106,10 @@ export class ViewFactory {
       boundElements[binderIdx] = element;
 
       // boundTextNodes
-      if (MapWrapper.size(binder.textBindings) > 0) {
-        var childNode = DOM.firstChild(DOM.templateAwareRoot(element));
-        var index = 0;
-        while (isPresent(childNode)) {
-          if (isPresent(MapWrapper.get(binder.textBindings, index))) {
-            ListWrapper.push(boundTextNodes, childNode);
-          }
-          childNode = DOM.nextSibling(childNode);
-          index++;
-        }
+      var childNodes = DOM.childNodes(DOM.templateAwareRoot(element));
+      var textNodeIndices = binder.textNodeIndices;
+      for (var i = 0; i<textNodeIndices.length; i++) {
+        ListWrapper.push(boundTextNodes, childNodes[textNodeIndices[i]]);
       }
 
       // viewContainers

@@ -53,7 +53,7 @@ export class ProtoViewBuilder {
     });
 
     return new ProtoView(
-      this._renderProtoView,
+      this._renderProtoView.render,
       this._changeDetection.createProtoChangeDetector('dummy'),
       this._elementBinders,
       this._eventHandlers,
@@ -116,7 +116,7 @@ export class ProtoViewBuilder {
   }
 
   _processTextBindings(renderElementBinder) {
-    MapWrapper.forEach(renderElementBinder.textBindings, (expressionStr, nodeIndex) => {
+    ListWrapper.forEach(renderElementBinder.textBindings, (expressionStr) => {
       var expression = this._parser.parseInterpolation(expressionStr, renderElementBinder.elementDescription);
       var memento = this._textNodesWithBindingCount++;
       ListWrapper.push(this._bindingRecords, new BindingRecord(expression, memento, null));

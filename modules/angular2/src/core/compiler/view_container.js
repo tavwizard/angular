@@ -18,14 +18,17 @@ export class ViewContainer {
   elementInjector: eiModule.ElementInjector;
   appInjector: Injector;
   hostElementInjector: eiModule.ElementInjector;
-  render: renderApi.ViewContainer;
+  render: renderApi.ViewContainerRef;
+  _renderer: renderApi.Renderer;
 
-  constructor(viewFactory: vfModule.ViewFactory,
-              renderViewContainer: renderApi.ViewContainer,
+  constructor(renderer: renderApi.Renderer,
+              viewFactory: vfModule.ViewFactory,
+              renderViewContainer: renderApi.ViewContainerRef,
               parentView: viewModule.View,
               defaultProtoView: viewModule.ProtoView,
               elementInjector: eiModule.ElementInjector) {
     this._viewFactory = viewFactory;
+    this._renderer = renderer;
     this.render = renderViewContainer;
     this.parentView = parentView;
     this.defaultProtoView = defaultProtoView;
@@ -101,7 +104,7 @@ export class ViewContainer {
   }
 
   insert(view, atIndex=-1): viewModule.View {
-    this.render.insert(view.render, atIndex);
+    this.renderer.insertView(this.render, view.render, atIndex);
     return this._insert(view, atIndex);
   }
 
@@ -120,7 +123,7 @@ export class ViewContainer {
     detachedView.changeDetector.remove();
     this._unlinkElementInjectors(detachedView);
     if (detachRender) {
-      this.render.detach();
+      this.renderer.detachView(this.render, detachedView.render);
     }
     return detachedView;
   }

@@ -1,27 +1,17 @@
-import * as api from '../api';
+import {List} from 'angular2/src/facade/collection';
+import {ProtoView} from './proto_view';
 
-export class ElementBinder extends api.ElementBinder {
+export class ElementBinder {
   contentTagSelector: string;
+  textNodeIndices: List<number>;
+  nestedProtoView: ProtoView;
   constructor({
-    index, parentIndex, distanceToParent,
-    parentWithDirectivesIndex,
-    distanceToParentWithDirectives,
-    directives, nestedProtoView,
-    elementDescription, initAttrs, propertyBindings, variableBindings,
-    eventBindings, propertyInterpolations, textBindings,
-    contentTagSelector
+    textNodeIndices,
+    contentTagSelector,
+    nestedProtoView
   }) {
-    super({
-      index: index, parentIndex: parentIndex, distanceToParent: distanceToParent,
-      parentWithDirectivesIndex: parentWithDirectivesIndex,
-      distanceToParentWithDirectives: distanceToParentWithDirectives,
-      directives: directives,
-      nestedProtoView: nestedProtoView,
-      elementDescription: elementDescription, initAttrs: initAttrs, propertyBindings: propertyBindings,
-      variableBindings: variableBindings,
-      eventBindings: eventBindings, propertyInterpolations: propertyInterpolations,
-      textBindings: textBindings
-    });
+    this.textNodeIndices = textNodeIndices;
     this.contentTagSelector = contentTagSelector;
+    this.nestedProtoView = nestedProtoView;
   }
 }

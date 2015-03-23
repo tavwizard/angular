@@ -17,8 +17,8 @@ export class ElementBinder {
   propertyInterpolations: Map<string, string>;
   variableBindings: Map<string, string>;
   eventBindings: Map<string, string>;
-  // Mapping from text node index to and interpolation expression
-  textBindings: Map<number, string>;
+  // List of text expression strings
+  textBindings: List<string>;
 
   constructor({
     index, parentIndex, distanceToParent, parentWithDirectivesIndex,
@@ -44,43 +44,30 @@ export class ElementBinder {
 }
 
 export class ProtoView {
+  render: ProtoViewRef;
   elementBinders:List<ElementBinder>;
   variableBindings: Map<string, string>;
 
-  constructor({elementBinders, variableBindings}) {
+  constructor({render, elementBinders, variableBindings}) {
+    this.render = render;
     this.elementBinders = elementBinders;
     this.variableBindings = variableBindings;
   }
 }
 
-export class View {
-  setElementProperty(boundElementIndex:number, propertyName:string, propertyValue:any):void {}
+// An opaque reference to a ProtoView
+export class ProtoViewRef {}
 
-  setComponentView(boundElementIndex:number, view:View):void {}
+// An opaque reference to a View
+export class ViewRef {}
 
-  setText(boundTextIndex:number, text:string):void {}
-
-  // TODO(tbosch): think about how to serialize callbacks
-  // - maybe keep a local WeakMap with ids?
-  listen(elementIndex:number, eventName:string, callback:Function):void {}
-
-  getViewContainer(index:number):ViewContainer {}
-}
-
-// Note: This API is minimal.
-// E.g. use methods on Renderer for creation/destruction of views
-export class ViewContainer {
-  insert(view:View, atIndex=-1):void {}
-
-  // Note: We can't detach based on an index
-  // as otherwise we would need to return the detached View in sync,
-  // which is not possible over a remote protocol
-  /**
-   * The method can be used together with insert to implement a view move, i.e.
-   * moving the dom nodes while the directives in the view stay intact.
-   * Note: The detached view cannot be inserted into another ViewContainer!
-   */
-  detach(view:View):void {}
+export class ViewContainerRef {
+  view:ViewRef;
+  viewContainerIndex:number;
+  constructor(view:ViewRef, viewContainerIndex: number) {
+    this.view = view;
+    this.viewContainerIndex = viewContainerIndex;
+  }
 }
 
 export class Template {
@@ -111,14 +98,36 @@ export class Renderer {
   // TODO(tbosch): union type return ProtoView or Promise<ProtoView>
   compile(template:Template) {}
 
-  // this will always return data in sync
-  createRootView(selectorOrElement, protoView:ProtoView):View {}
-
-  createView(protoView:ProtoView):View {}
+  createView(protoView:ProtoViewRef):ViewRef {}
 
   // Note: This does NOT remove the view from
   // a ViewContainer nor it's parent component!
-  destroyView(view:View):void {}
+  destroyView(view:ViewRef):void {}
+
+  // this will always return data in sync
+  createRootView(selectorOrElement):ViewRef {}
+
+  insertViewIntoContainer(vc:ViewContainerRef, view:ViewRef, atIndex=-1):void {}
+
+  // Note: We can't detach based on an index
+  // as otherwise we would need to return the detached View in sync,
+  // which is not possible over a remote protocol
+  /**
+   * The method can be used together with insert to implement a view move, i.e.
+   * moving the dom nodes while the directives in the view stay intact.
+   * Note: The detached view cannot be inserted into another ViewContainer!
+   */
+  detachViewFromContainer(vc:ViewContainerRef, view:ViewRef):void {}
+
+  setElementProperty(view:ViewRef, elementIndex:number, propertyName:string, propertyValue:any):void {}
+
+  setComponentView(view:ViewRef, elementIndex:number, nestedView:ViewRef):void {}
+
+  setText(view:ViewRef, textNodeIndex:number, text:string):void {}
+
+  // TODO(tbosch): think about how to serialize callbacks
+  // - maybe keep a local WeakMap with ids?
+  listen(view:ViewRef, elementIndex:number, eventName:string, callback:Function):void {}
 
   // To be called at end of VmTurn
   flush():void {}
