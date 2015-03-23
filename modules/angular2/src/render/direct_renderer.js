@@ -7,15 +7,24 @@ import {ProtoView} from './view/proto_view';
 import {ViewFactory} from './view/view_factory';
 import {Compiler} from './compiler/compiler';
 import {ShadowDomStrategy} from './shadow_dom/shadow_dom_strategy';
+import {EventManager} from './events/event_manager';
+import {ElementPropertyAccessor} from './view/element_property_accessor';
 
 export class DirectRenderer extends Renderer {
   _compiler: Compiler;
   _viewFactory: ViewFactory;
+  _shadowDomStrategy: ShadowDomStrategy;
+  _evenManager: EventManager;
+  _propertyAccessor: ElementPropertyAccessor;
 
   constructor(
-      compiler: Compiler, viewFactory: ViewFactory) {
+      compiler: Compiler, viewFactory: ViewFactory, shadowDomStrategy: ShadowDomStrategy,
+      eventManager: EventManager, propertyAccessor: ElementPropertyAccessor) {
     this._compiler = compiler;
     this._viewFactory = viewFactory;
+    this._shadowDomStrategy = shadowDomStrategy;
+    this._evenManager = eventManager;
+    this._propertyAccessor = propertyAccessor;
   }
 
   _getViewContainer(vc:ViewContainerRef) {
@@ -49,11 +58,11 @@ export class DirectRenderer extends Renderer {
   }
 
   setElementProperty(view:ViewRef, elementIndex:number, propertyName:string, propertyValue:any):void {
-    view.setElementProperty(elementIndex, propertyName, propertyValue);
+    view.setElementProperty(this._propertyAccessor, elementIndex, propertyName, propertyValue);
   }
 
   setComponentView(view:ViewRef, elementIndex:number, nestedView:ViewRef):void {
-    view.setComponentView(elementIndex, nestedView);
+    view.setComponentView(this._shadowDomStrategy, elementIndex, nestedView);
   }
 
   setText(view:ViewRef, textNodeIndex:number, text:string):void {
@@ -61,6 +70,6 @@ export class DirectRenderer extends Renderer {
   }
 
   listen(view:ViewRef, elementIndex:number, eventName:string, callback:Function):void {
-    view.listen(elementIndex, eventName, callback);
+    view.listen(this._eventManager, elementIndex, eventName, callback);
   }
 }

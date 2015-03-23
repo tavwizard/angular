@@ -47,7 +47,6 @@ import {DirectRenderer} from 'angular2/src/render/direct_renderer';
 import * as renderCompilerModule from 'angular2/src/render/compiler/compiler';
 import * as renderViewFactoryModule from 'angular2/src/render/view/view_factory';
 import {ElementPropertyAccessor} from 'angular2/src/render/view/element_property_accessor';
-import {ViewServices} from 'angular2/src/render/view/view_services';
 
 export function main() {
   ddescribe('integration tests', function() {
@@ -81,16 +80,15 @@ export function main() {
       var eventManager = null;
       var renderViewFactory = new renderViewFactoryModule.ViewFactory(
         1,
-        new ViewServices(
-          eventManager,
-          shadowDomStrategy,
-          new ElementPropertyAccessor()
-        )
+        shadowDomStrategy
       );
 
       renderer = new DirectRenderer(
         renderCompiler,
-        renderViewFactory
+        renderViewFactory,
+        shadowDomStrategy,
+        eventManager,
+        new ElementPropertyAccessor()
       );
 
       tplResolver = new MockTemplateResolver();

@@ -11,7 +11,6 @@ import {EventManager} from '../events/event_manager';
 import {ViewContainer} from './view_container';
 import {ProtoView} from './proto_view';
 import {View} from './view';
-import {ViewServices} from './view_services';
 import {NG_BINDING_CLASS_SELECTOR, NG_BINDING_CLASS} from '../util';
 
 import {ProtoViewBuilder} from './proto_view_builder';
@@ -22,13 +21,12 @@ export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
 export class ViewFactory {
   _poolCapacity:number;
   _pooledViews:List<View>;
-  _eventManager:EventManager;
-  _viewServices:ViewServices;
+  _shadowDomStrategy:ShadowDomStrategy;
 
-  constructor(capacity, viewServices) {
+  constructor(capacity, shadowDomStrategy) {
     this._poolCapacity = capacity;
     this._pooledViews = ListWrapper.create();
-    this._viewServices = viewServices;
+    this._shadowDomStrategy = shadowDomStrategy;
   }
 
   getView(protoView:ProtoView): View {
@@ -48,7 +46,7 @@ export class ViewFactory {
     var rootProtoViewBuilder = new ProtoViewBuilder(element);
     rootProtoViewBuilder.setInstantiateInPlace(true);
     rootProtoViewBuilder.bindElement(element, 'root element');
-    this._viewServices.shadowDomStrategy.shimAppElement(element);
+    this._shadowDomStrategy.shimAppElement(element);
     return this.getView(rootProtoViewBuilder.build().render);
   }
 
@@ -128,7 +126,7 @@ export class ViewFactory {
     }
 
     var view = new View(
-      this._viewServices, protoView, viewRootNodes,
+      protoView, viewRootNodes,
       boundTextNodes, boundElements, viewContainers, contentTags
     );
 

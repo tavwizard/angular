@@ -10,7 +10,10 @@ import {ViewContainer} from './view_container';
 import {ProtoView} from './proto_view';
 import {LightDom} from '../shadow_dom/emulation/light_dom';
 import {Content} from '../shadow_dom/emulation/content_tag';
-import {ViewServices} from './view_services';
+
+import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
+import {EventManager} from '../events/event_manager';
+import {ElementPropertyAccessor} from './element_property_accessor';
 
 const NG_BINDING_CLASS = 'ng-binding';
 
@@ -30,13 +33,11 @@ export class View extends api.ViewRef {
   contentTags: List<Content>;
   lightDoms: List<LightDom>;
   proto: ProtoView;
-  _viewServices: ViewServices;
   _hydrated: boolean;
 
   constructor(
-      viewServices: ViewServices, proto:ProtoView, rootNodes:List,
+      proto:ProtoView, rootNodes:List,
       boundTextNodes: List, boundElements:List, viewContainers:List, contentTags:List) {
-    this._viewServices = viewServices;
     this.proto = proto;
     this.rootNodes = rootNodes;
     this.boundTextNodes = boundTextNodes;
@@ -52,21 +53,20 @@ export class View extends api.ViewRef {
     return this._hydrated;
   }
 
-  setElementProperty(elementIndex:number, propertyName:string, value:Object) {
-    this._viewServices.propertyAccessor.setProperty(this.boundElements[elementIndex], propertyName, value);
+  setElementProperty(propertyAccessor:ElementPropertyAccessor, elementIndex:number, propertyName:string, value:Object) {
+    propertyAccessor.setProperty(this.boundElements[elementIndex], propertyName, value);
   }
 
   setText(textIndex:number, value:string) {
     DOM.setText(this.boundTextNodes[textIndex], value);
   }
 
-  listen(elementIndex:number, eventName:string, callback:Function) {
-    this._viewServices.eventManager(this.boundElements[elementIndex], eventName, callback);
+  listen(eventManager:EventManager, elementIndex:number, eventName:string, callback:Function) {
+    eventManager(this.boundElements[elementIndex], eventName, callback);
   }
 
-  setComponentView(elementIndex:number, childView:View) {
+  setComponentView(strategy: ShadowDomStrategy, elementIndex:number, childView:View) {
     var element = this.boundElements[elementIndex];
-    var strategy = this._viewServices.shadowDomStrategy;
     var lightDom = strategy.constructLightDom(this, childView, element);
     strategy.attachTemplate(element, childView);
     this.lightDoms[elementIndex] = lightDom;
