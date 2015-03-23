@@ -21,8 +21,6 @@ export class ProtoViewBuilder {
   _eventHandlers: List;
   _bindingRecords: List;
   _elementBinders: List;
-  _inheritedProtoElementInjectors: List;
-  _inheritedProtoElementInjectorDistances: List;
   _variableBindings: List;
   _protoLocals: Map;
   _textNodesWithBindingCount: number;
@@ -46,8 +44,6 @@ export class ProtoViewBuilder {
     this._eventHandlers = [];
     this._bindingRecords = [];
     this._elementBinders = [];
-    this._inheritedProtoElementInjectors = [];
-    this._inheritedProtoElementInjectorDistances = []
     this._variableBindings = ListWrapper.create(); // TODO
     this._protoLocals = MapWrapper.create(); // TODO
     this._textNodesWithBindingCount = 0;
@@ -177,19 +173,12 @@ export class ProtoViewBuilder {
 
   _createProtoElementInjector(renderElementBinder, allDirectives, hasComponentDirective) {
     var protoElementInjector = null;
-    var parentProtoElementInjector = null;
-    var distanceToParentElementInjector;
-    var inheritedProtoElementInjector;
-
-    if (renderElementBinder.parentIndex !== -1) {
-      parentProtoElementInjector = this._inheritedProtoElementInjectors[renderElementBinder.parentIndex];
-      distanceToParentElementInjector =
-        this._inheritedProtoElementInjectorDistances[renderElementBinder.parentIndex] + renderElementBinder.distanceToParent;
-      inheritedProtoElementInjector = parentProtoElementInjector;
-    } else {
-      distanceToParentElementInjector = 0;
-      inheritedProtoElementInjector = null;
+    var parentProtoElementInjector;
+    var distanceToParentElementInjector = renderElementBinder.distanceToParentWithDirectives;
+    if (renderElementBinder.parentWithDirectivesIndex !== -1) {
+      parentProtoElementInjector = this._elementBinders[renderElementBinder.parentWithDirectivesIndex].protoElementInjector;
     }
+
     // Create a protoElementInjector for any element that either has bindings *or* has one
     // or more var- defined. Elements with a var- defined need a their own element injector
     // so that, when hydrating, $implicit can be set to the element.
@@ -202,11 +191,7 @@ export class ProtoViewBuilder {
         hasComponentDirective,
         distanceToParentElementInjector
       );
-      inheritedProtoElementInjector = protoElementInjector;
-      distanceToParentElementInjector = 0;
     }
-    ListWrapper.push(this._inheritedProtoElementInjectors, inheritedProtoElementInjector);
-    ListWrapper.push(this._inheritedProtoElementInjectorDistances, distanceToParentElementInjector);
     return protoElementInjector;
   }
 

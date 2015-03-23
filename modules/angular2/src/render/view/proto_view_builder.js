@@ -45,8 +45,10 @@ export class ProtoViewBuilder {
       var nestedProtoView =
           isPresent(ebb.nestedProtoView) ? ebb.nestedProtoView.build() : null;
       var parentIndex = isPresent(ebb.parent) ? ebb.parent.index : -1;
+      var parentWithDirectivesIndex = isPresent(ebb.parentWithDirectives) ? ebb.parentWithDirectives.index : -1;
       var elBinder = new ElementBinder({
         index: ebb.index, parentIndex:parentIndex, distanceToParent:ebb.distanceToParent,
+        parentWithDirectivesIndex: parentWithDirectivesIndex, distanceToParentWithDirectives: ebb.distanceToParentWithDirectives,
         directives: ebb.directives,
         nestedProtoView: nestedProtoView,
         elementDescription: ebb.elementDescription, initAttrs: ebb.initAttrs,
@@ -69,6 +71,8 @@ export class ElementBinderBuilder {
   index:number;
   parent:ElementBinderBuilder;
   distanceToParent:number;
+  parentWithDirectives:ElementBinderBuilder;
+  distanceToParentWithDirectives:number;
   directives:List<DirectiveMetadata>;
   nestedProtoView:ProtoViewBuilder;
   elementDescription:string;
@@ -89,6 +93,8 @@ export class ElementBinderBuilder {
     this.index = index;
     this.parent = null;
     this.distanceToParent = 0;
+    this.parentWithDirectives = null;
+    this.distanceToParentWithDirectives = 0;
     this.directives = [];
     this.nestedProtoView = null;
     this.elementDescription = description;
@@ -103,7 +109,18 @@ export class ElementBinderBuilder {
 
   setParent(parent:ElementBinderBuilder, distanceToParent):ElementBinderBuilder {
     this.parent = parent;
-    this.distanceToParent = distanceToParent;
+    if (isPresent(parent)) {
+      this.distanceToParent = distanceToParent;
+      if (parent.directives.length > 0) {
+        this.parentWithDirectives = parent;
+        this.distanceToParentWithDirectives = distanceToParent;
+      } else {
+        this.parentWithDirectives = parent.parentWithDirectives;
+        if (isPresent(this.parentWithDirectives)) {
+          this.distanceToParentWithDirectives = distanceToParent + parent.distanceToParentWithDirectives;
+        }
+      }
+    }
     return this;
   }
 

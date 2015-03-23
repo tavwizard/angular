@@ -4,6 +4,8 @@ export class ElementBinder {
   index:number;
   parentIndex:number;
   distanceToParent:number;
+  parentWithDirectivesIndex:number;
+  distanceToParentWithDirectives:number;
   directives:List<DirectiveMetadata>;
   nestedProtoView:ProtoView;
   elementDescription:string;
@@ -19,13 +21,16 @@ export class ElementBinder {
   textBindings: Map<number, string>;
 
   constructor({
-    index, parentIndex, distanceToParent, directives, nestedProtoView,
+    index, parentIndex, distanceToParent, parentWithDirectivesIndex,
+    distanceToParentWithDirectives, directives, nestedProtoView,
     elementDescription, initAttrs, propertyBindings, variableBindings,
     eventBindings, propertyInterpolations, textBindings
   }) {
     this.index = index;
     this.parentIndex = parentIndex;
     this.distanceToParent = distanceToParent;
+    this.parentWithDirectivesIndex = parentWithDirectivesIndex;
+    this.distanceToParentWithDirectives = distanceToParentWithDirectives;
     this.directives = directives;
     this.nestedProtoView = nestedProtoView;
     this.elementDescription = elementDescription;
