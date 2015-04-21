@@ -1,51 +1,28 @@
 var _ = require('lodash');
 
-module.exports = function filterPublicDocs(modules) {
+module.exports = function filterPublicDocs(modules, EXPORT_DOC_TYPES) {
   return {
-    $runAfter: ['tags-parsed'],
+    $runAfter: ['tags-parsed', 'cloneExportedFromDocs'],
     $runBefore: ['computing-ids'],
-    docTypes: [],
-    $validate: {
-      docTypes: { presence: true }
-    },
     $process: function(docs) {
 
-      docTypes = this.docTypes;
+      // Filter out the documents that are not public
+      return _.filter(docs, function(doc) {
 
+        if (doc.docType === 'module') {
+          // doc is a module - is it public?
+          return doc.public;
+        }
 
-      docs = _.filter(docs, function(doc) {
+        if (EXPORT_DOC_TYPES.indexOf(doc.docType) === -1) {
+          // doc is not a type we care about
+          return true;
+        }
 
-        if (docTypes.indexOf(doc.docType) === -1) return true;
-        if (!doc.publicModule) return false;
+        // doc is in a public module
+        return doc.moduleDoc && doc.moduleDoc.public;
 
-        updateModule(doc);
-
-        return true;
       });
-
-      docs = _.filter(docs, function(doc) {
-        return doc.docType !== 'module' || doc.isPublic;
-      });
-      return docs;
     }
   };
-
-
-  function updateModule(classDoc) {
-
-    var originalModule = classDoc.moduleDoc;
-    var publicModule = modules[classDoc.publicModule];
-
-    if (!publicModule) {
-      throw new Error('Missing module definition: "' + classDoc.publicModule + '"\n' +
-                      'Referenced in class: "' + classDoc.moduleDoc.id + '/' + classDoc.name + '"');
-    }
-
-    publicModule.isPublic = true;
-
-    _.remove(classDoc.moduleDoc.exports, function(doc) { return doc === classDoc; });
-    classDoc.moduleDoc = publicModule;
-    publicModule.exports.push(classDoc);
-
-  }
 };

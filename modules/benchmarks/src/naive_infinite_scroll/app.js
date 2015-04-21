@@ -1,7 +1,7 @@
 import {int, isPresent} from 'angular2/src/facade/lang';
 import {reflector} from 'angular2/src/reflection/reflection';
 import {getIntParameter, bindAction} from 'angular2/src/test_lib/benchmark_util';
-import {bootstrap, Component, Viewport, Template, ViewContainer, Compiler}
+import {bootstrap, Component, Viewport, View, ViewContainer, Compiler}
     from 'angular2/angular2';
 import {PromiseWrapper} from 'angular2/src/facade/async';
 import {ListWrapper} from 'angular2/src/facade/collection';
@@ -10,6 +10,21 @@ import {If, For} from 'angular2/directives';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {document} from 'angular2/src/facade/browser';
 
+
+@Component({selector: 'scroll-app'})
+@View({
+  directives: [ScrollAreaComponent, If, For],
+  template: `
+  <div>
+    <div style="display: flex">
+      <scroll-area id="testArea"></scroll-area>
+    </div>
+    <div template="if scrollAreas.length > 0">
+      <p>Following tables are only here to add weight to the UI:</p>
+      <scroll-area template="for #scrollArea of scrollAreas"></scroll-area>
+    </div>
+  </div>`
+})
 export class App {
   scrollAreas:List<int>;
   iterationCount:int;
@@ -76,26 +91,4 @@ export class App {
   _getScrollDiv() {
     return DOM.query('body /deep/ #testArea /deep/ #scrollDiv');
   }
-}
-
-export function setupReflectorForApp() {
-  reflector.registerType(App, {
-    'factory': () => { return new App(); },
-    'parameters': [],
-    'annotations': [
-      new Component({selector: 'scroll-app'}),
-      new Template({
-        directives: [ScrollAreaComponent, If, For],
-        inline: `
-          <div>
-            <div style="display: flex">
-              <scroll-area id="testArea"></scroll-area>
-            </div>
-            <div template="if scrollAreas.length > 0">
-              <p>Following tables are only here to add weight to the UI:</p>
-              <scroll-area template="for #scrollArea of scrollAreas"></scroll-area>
-            </div>
-          </div>`
-      })]
-  });
 }

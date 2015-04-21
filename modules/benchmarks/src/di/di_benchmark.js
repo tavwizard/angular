@@ -1,36 +1,13 @@
-import {Injector, Key} from "angular2/di";
+import {Injectable, Injector, Key, bind} from "angular2/di";
 import {reflector} from 'angular2/src/reflection/reflection';
+import {ReflectionCapabilities} from 'angular2/src/reflection/reflection_capabilities';
 import {getIntParameter, bindAction, microBenchmark} from 'angular2/src/test_lib/benchmark_util';
 import {BrowserDomAdapter} from 'angular2/src/dom/browser_adapter';
 
 var count = 0;
 
 function setupReflector() {
-  reflector.registerType(A, {
-    'factory': () => new A(),
-    'parameters': [],
-    'annotations' : []
-  });
-  reflector.registerType(B, {
-    'factory': (a) => new B(a),
-    'parameters': [[A]],
-    'annotations' : []
-  });
-  reflector.registerType(C, {
-    'factory': (b) => new C(b),
-    'parameters': [[B]],
-    'annotations' : []
-  });
-  reflector.registerType(D, {
-    'factory': (c,b) => new D(c,b),
-    'parameters': [[C],[B]],
-    'annotations' : []
-  });
-  reflector.registerType(E, {
-    'factory': (d,c) => new E(d,c),
-    'parameters': [[D],[C]],
-    'annotations' : []
-  });
+  reflector.reflectionCapabilities = new ReflectionCapabilities();
 }
 
 export function main() {
@@ -39,18 +16,27 @@ export function main() {
 
   setupReflector();
   var bindings = [A, B, C, D, E];
-  var injector = new Injector(bindings);
+  var injector = Injector.resolveAndCreate(bindings);
 
   var D_KEY = Key.get(D);
   var E_KEY = Key.get(E);
   var childInjector = injector.
-    createChild([]).
-    createChild([]).
-    createChild([]).
-    createChild([]).
-    createChild([]);
+    resolveAndCreateChild([]).
+    resolveAndCreateChild([]).
+    resolveAndCreateChild([]).
+    resolveAndCreateChild([]).
+    resolveAndCreateChild([]);
 
-  function getByToken () {
+  var variousBindings = [
+    A,
+    bind(B).toClass(C),
+    [D, [E]],
+    bind(F).toValue(6)
+  ];
+
+  var variousBindingsResolved = Injector.resolve(variousBindings);
+
+  function getByToken() {
     for (var i = 0; i < iterations; ++i) {
       injector.get(D);
       injector.get(E);
@@ -63,17 +49,35 @@ export function main() {
     }
   }
 
-  function getChild () {
+  function getChild() {
     for (var i = 0; i < iterations; ++i) {
       childInjector.get(D);
       childInjector.get(E);
     }
   }
 
-  function instantiate () {
+  function instantiate() {
     for (var i = 0; i < iterations; ++i) {
-      var child = injector.createChild([E]);
+      var child = injector.resolveAndCreateChild([E]);
       child.get(E);
+    }
+  }
+
+  /**
+   * Creates an injector with a variety of binding types.
+   */
+  function createVariety() {
+    for (var i = 0; i < iterations; ++i) {
+      Injector.resolveAndCreate(variousBindings);
+    }
+  }
+
+  /**
+   * Same as [createVariety] but resolves bindings ahead of time.
+   */
+  function createVarietyResolved() {
+    for (var i = 0; i < iterations; ++i) {
+      Injector.fromResolvedBindings(variousBindingsResolved);
     }
   }
 
@@ -93,37 +97,56 @@ export function main() {
     '#instantiate',
     () => microBenchmark('injectAvg', iterations, instantiate)
   );
+  bindAction(
+    '#createVariety',
+    () => microBenchmark('injectAvg', iterations, createVariety)
+  );
+  bindAction(
+    '#createVarietyResolved',
+    () => microBenchmark('injectAvg', iterations, createVarietyResolved)
+  );
 }
 
 
 
-
+@Injectable()
 class A {
   constructor() {
     count++;
   }
 }
 
+@Injectable()
 class B {
   constructor(a:A) {
     count++;
   }
 }
 
+@Injectable()
 class C {
   constructor(b:B) {
     count++;
   }
 }
 
+@Injectable()
 class D {
   constructor(c:C, b:B) {
     count++;
   }
 }
 
+@Injectable()
 class E {
   constructor(d:D, c:C) {
+    count++;
+  }
+}
+
+@Injectable()
+class F {
+  constructor(e:E, d:D) {
     count++;
   }
 }

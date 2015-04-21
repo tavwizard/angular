@@ -2,29 +2,13 @@ import {CONST, addAnnotation} from 'angular2/src/facade/lang';
 import {DependencyAnnotationClass} from 'angular2/di';
 
 /**
- * The directive can inject an emitter function that would emit events onto the
- * directive host element.
- */
-export class EventEmitterAnnotation extends DependencyAnnotationClass {
-  eventName: string;
-  //@CONST()
-  constructor(eventName) {
-    super();
-    this.eventName = eventName;
-  }
-
-  get token() {
-    return Function;
-  }
-}
-
-export function EventEmitter(eventName:string) {
-  return (c) => { addAnnotation(c, new EventEmitterAnnotation(eventName)); }
-}
-
-/**
- * The directive can inject a property setter that would allow setting this property on the
- * host element
+ * Specifies that a function for setting host properties should be injected.
+ *
+ * NOTE: This is changing pre 1.0.
+ *
+ * The directive can inject a property setter that would allow setting this property on the host element.
+ *
+ * @exportedAs angular2/annotations
  */
 export class PropertySetterAnnotation extends DependencyAnnotationClass {
   propName: string;
@@ -44,7 +28,32 @@ export function PropertySetter(propName:string) {
 }
 
 /**
- * The directive can inject the value of an attribute of the host element
+ * Specifies that a constant attribute value should be injected.
+ *
+ * The directive can inject constant string literals of host element attributes.
+ *
+ * ## Example
+ *
+ * Suppose we have an `<input>` element and want to know its `type`.
+ *
+ * ```html
+ * <input type="text">
+ * ```
+ *
+ * A decorator can inject string literal `text` like so:
+ *
+ * ```javascript
+ * @Decorator({
+ *   selector: `input'
+ * })
+ * class InputDecorator {
+ *   constructor(@Attribute('type') type) {
+ *     // type would be `text` in this example
+ *   }
+ * }
+ * ```
+ *
+ * @exportedAs angular2/annotations
  */
 export class AttributeAnnotation extends DependencyAnnotationClass {
   attributeName: string;
@@ -65,4 +74,24 @@ export class AttributeAnnotation extends DependencyAnnotationClass {
 
 export function Attribute(attributeName:string) {
   return (c) => { addAnnotation(c, new AttributeAnnotation(attributeName)); }
+}
+	  
+/**
+ * Specifies that a [QueryList] should be injected.
+ *
+ * See: [QueryList] for usage and example.
+ *
+ * @exportedAs angular2/annotations
+ */
+export class QueryAnnotation extends DependencyAnnotationClass {
+  directive;
+  //@CONST()
+  constructor(directive) {
+    super();
+    this.directive = directive;
+  }
+}
+
+export function Query(directive) {
+  return (c) => { addAnnotation(c, new QueryAnnotation(directive)); }
 }

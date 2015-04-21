@@ -8,9 +8,12 @@ module.exports = function(config) {
     frameworks: ['dart-unittest'],
 
     files: [
+      // Init and configure guiness.
+      {pattern: 'test-init.dart', included: true},
       // Unit test files needs to be included.
       // Karma-dart generates `__adapter_unittest.dart` that imports these files.
       {pattern: 'modules/*/test/**/*_spec.js', included: true},
+      {pattern: 'modules/*/test/**/*_spec.dart', included: true},
       {pattern: 'tools/transpiler/spec/**/*_spec.js', included: true},
 
       // These files are not included, they are imported by the unit tests above.
@@ -56,25 +59,14 @@ module.exports = function(config) {
     },
 
     preprocessors: {
-      'modules/**/*.js': ['traceur'],
-      'tools/**/*.js': ['traceur']
+      'modules/**/*.js': ['ts2dart'],
+      'tools/**/*.js': ['ts2dart']
     },
 
-    traceurPreprocessor: {
-      options: {
-        outputLanguage: 'dart',
-        sourceMaps: true,
-        script: false,
-        modules: 'register',
-        memberVariables: true,
-        types: true,
-        // typeAssertions: true,
-        // typeAssertionModule: 'assert',
-        annotations: true
-      },
+    ts2dartPreprocessor: {
       resolveModuleName: file2moduleName,
       transformPath: function(fileName) {
-        return fileName.replace('.js', '.dart');
+        return fileName.replace(/.js$/, '.dart');
       }
     },
 
@@ -89,5 +81,5 @@ module.exports = function(config) {
   });
 
 
-  config.plugins.push(require('./tools/transpiler/karma-traceur-preprocessor'));
+  config.plugins.push(require('./tools/transpiler/karma-ts2dart-preprocessor'));
 };

@@ -1,15 +1,19 @@
 import {isPresent} from 'angular2/src/facade/lang';
-import {Observable, ObservableController, ObservableWrapper} from 'angular2/src/facade/async';
+import {Observable, EventEmitter, ObservableWrapper} from 'angular2/src/facade/async';
 import {StringMap, StringMapWrapper, ListWrapper, List} from 'angular2/src/facade/collection';
 import {Validators} from './validators';
 
 /**
- * @publicModule angular2/forms
+ * Indicates that a Control is valid, i.e. that no errors exist in the input value.
+ *
+ * @exportedAs angular2/forms
  */
 export const VALID = "VALID";
 
 /**
- * @publicModule angular2/forms
+ * Indicates that a Control is invalid, i.e. that an error exists in the input value.
+ *
+ * @exportedAs angular2/forms
  */
 export const INVALID = "INVALID";
 
@@ -26,7 +30,7 @@ export const INVALID = "INVALID";
 //}
 
 /**
- * @publicModule angular2/forms
+ * Omitting from external API doc as this is really an abstract internal concept.
  */
 export class AbstractControl {
   _value:any;
@@ -36,8 +40,7 @@ export class AbstractControl {
   _parent:any; /* ControlGroup | ControlArray */
   validator:Function;
 
-  valueChanges:Observable;
-  _valueChangesController:ObservableController;
+  _valueChanges:EventEmitter;
 
   constructor(validator:Function) {
     this.validator = validator;
@@ -68,6 +71,10 @@ export class AbstractControl {
     return ! this.pristine;
   }
 
+  get valueChanges():Observable {
+    return this._valueChanges;
+  }
+
   setParent(parent){
     this._parent = parent;
   }
@@ -80,22 +87,25 @@ export class AbstractControl {
 }
 
 /**
- * @publicModule angular2/forms
+ * Defines a part of a form that cannot be divided into other controls.
+ *
+ * `Control` is one of the three fundamental building blocks used to define forms in Angular, along with [ControlGroup]
+ * and [ControlArray].
+ *
+ * @exportedAs angular2/forms
  */
 export class Control extends AbstractControl {
   constructor(value:any, validator:Function = Validators.nullValidator) {
     super(validator);
     this._setValueErrorsStatus(value);
-
-    this._valueChangesController = ObservableWrapper.createController();
-    this.valueChanges = ObservableWrapper.createObservable(this._valueChangesController);
+    this._valueChanges = new EventEmitter();
   }
 
   updateValue(value:any):void {
     this._setValueErrorsStatus(value);
     this._pristine = false;
 
-    ObservableWrapper.callNext(this._valueChangesController, this._value);
+    ObservableWrapper.callNext(this._valueChanges, this._value);
 
     this._updateParent();
   }
@@ -108,7 +118,16 @@ export class Control extends AbstractControl {
 }
 
 /**
- * @publicModule angular2/forms
+ * Defines a part of a form, of fixed length, that can contain other controls.
+ *
+ * A ControlGroup aggregates the values and errors of each [Control] in the group. Thus, if one of the controls in a
+ * group is invalid, the entire group is invalid. Similarly, if a control changes its value, the entire group changes
+ * as well.
+ *
+ * `ControlGroup` is one of the three fundamental building blocks used to define forms in Angular, along with [Control]
+ * and [ControlArray]. [ControlArray] can also contain other controls, but is of variable length.
+ *
+ * @exportedAs angular2/forms
  */
 export class ControlGroup extends AbstractControl {
   controls:StringMap;
@@ -119,8 +138,7 @@ export class ControlGroup extends AbstractControl {
     this.controls = controls;
     this._optionals = isPresent(optionals) ? optionals : {};
 
-    this._valueChangesController = ObservableWrapper.createController();
-    this.valueChanges = ObservableWrapper.createObservable(this._valueChangesController);
+    this._valueChanges = new EventEmitter();
 
     this._setParentForControls();
     this._setValueErrorsStatus();
@@ -151,7 +169,7 @@ export class ControlGroup extends AbstractControl {
     this._setValueErrorsStatus();
     this._pristine = false;
 
-    ObservableWrapper.callNext(this._valueChangesController, this._value);
+    ObservableWrapper.callNext(this._valueChanges, this._value);
 
     this._updateParent();
   }
@@ -186,7 +204,16 @@ export class ControlGroup extends AbstractControl {
 }
 
 /**
- * @publicModule angular2/forms
+ * Defines a part of a form, of variable length, that can contain other controls.
+ *
+ * A `ControlArray` aggregates the values and errors of each [Control] in the group. Thus, if one of the controls in a
+ * group is invalid, the entire group is invalid. Similarly, if a control changes its value, the entire group changes
+ * as well.
+ *
+ * `ControlArray` is one of the three fundamental building blocks used to define forms in Angular, along with [Control]
+ * and [ControlGroup]. [ControlGroup] can also contain other controls, but is of fixed length.
+ *
+ * @exportedAs angular2/forms
  */
 export class ControlArray extends AbstractControl {
   controls:List<AbstractControl>;
@@ -195,8 +222,7 @@ export class ControlArray extends AbstractControl {
     super(validator);
     this.controls = controls;
 
-    this._valueChangesController = ObservableWrapper.createController();
-    this.valueChanges = ObservableWrapper.createObservable(this._valueChangesController);
+    this._valueChanges = new EventEmitter();
 
     this._setParentForControls();
     this._setValueErrorsStatus();
@@ -231,7 +257,7 @@ export class ControlArray extends AbstractControl {
     this._setValueErrorsStatus();
     this._pristine = false;
 
-    ObservableWrapper.callNext(this._valueChangesController, this._value);
+    ObservableWrapper.callNext(this._valueChanges, this._value);
 
     this._updateParent();
   }

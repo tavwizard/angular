@@ -22,11 +22,12 @@ import {
   PrefixNot
   } from './parser/ast';
 
-import {ChangeRecord, ChangeDispatcher, ChangeDetector, ProtoChangeDetector} from './interfaces';
+import {ChangeDispatcher, ChangeDetector, ProtoChangeDetector} from './interfaces';
 import {ChangeDetectionUtil} from './change_detection_util';
 import {DynamicChangeDetector} from './dynamic_change_detector';
 import {ChangeDetectorJITGenerator} from './change_detection_jit_generator';
 import {PipeRegistry} from './pipes/pipe_registry';
+import {BindingRecord} from './binding_record';
 
 import {coalesce} from './coalesce';
 
@@ -45,18 +46,6 @@ import {
   RECORD_TYPE_INTERPOLATE
   } from './proto_record';
 
-export class BindingRecord {
-  ast:AST;
-  bindingMemento:any;
-  directiveMemento:any;
-
-  constructor(ast:AST, bindingMemento:any, directiveMemento:any) {
-    this.ast = ast;
-    this.bindingMemento = bindingMemento;
-    this.directiveMemento = directiveMemento;
-  }
-}
-
 export class DynamicProtoChangeDetector extends ProtoChangeDetector {
   _pipeRegistry:PipeRegistry;
   _records:List<ProtoRecord>;
@@ -68,17 +57,17 @@ export class DynamicProtoChangeDetector extends ProtoChangeDetector {
     this._changeControlStrategy = changeControlStrategy;
   }
 
-  instantiate(dispatcher:any, bindingRecords:List<any>, variableBindings:List<any>, directiveMementos:List<any>) {
+  instantiate(dispatcher:any, bindingRecords:List<any>, variableBindings:List<any>, directiveRecords:List<any>) {
     this._createRecordsIfNecessary(bindingRecords, variableBindings);
     return new DynamicChangeDetector(this._changeControlStrategy, dispatcher,
-      this._pipeRegistry, this._records, directiveMementos);
+      this._pipeRegistry, this._records, directiveRecords);
   }
 
   _createRecordsIfNecessary(bindingRecords:List<any>, variableBindings:List<any>) {
     if (isBlank(this._records)) {
       var recordBuilder = new ProtoRecordBuilder();
-      ListWrapper.forEach(bindingRecords, (r) => {
-        recordBuilder.addAst(r.ast, r.bindingMemento, r.directiveMemento, variableBindings);
+      ListWrapper.forEach(bindingRecords, (b) => {
+        recordBuilder.addAst(b, variableBindings);
       });
       this._records = coalesce(recordBuilder.records);
     }
@@ -98,22 +87,22 @@ export class JitProtoChangeDetector extends ProtoChangeDetector {
     this._changeControlStrategy = changeControlStrategy;
   }
 
-  instantiate(dispatcher:any, bindingRecords:List<any>, variableBindings:List<any>, directiveMementos:List<any>) {
-    this._createFactoryIfNecessary(bindingRecords, variableBindings, directiveMementos);
+  instantiate(dispatcher:any, bindingRecords:List<any>, variableBindings:List<any>, directiveRecords:List<any>) {
+    this._createFactoryIfNecessary(bindingRecords, variableBindings, directiveRecords);
     return this._factory(dispatcher, this._pipeRegistry);
   }
 
-  _createFactoryIfNecessary(bindingRecords:List<any>, variableBindings:List<any>, directiveMementos:List<any>) {
+  _createFactoryIfNecessary(bindingRecords:List<any>, variableBindings:List<any>, directiveRecords:List<any>) {
     if (isBlank(this._factory)) {
       var recordBuilder = new ProtoRecordBuilder();
-      ListWrapper.forEach(bindingRecords, (r) => {
-        recordBuilder.addAst(r.ast, r.bindingMemento, r.directiveMemento, variableBindings);
+      ListWrapper.forEach(bindingRecords, (b) => {
+        recordBuilder.addAst(b, variableBindings);
       });
       var c = _jitProtoChangeDetectorClassCounter++;
       var records = coalesce(recordBuilder.records);
       var typeName = `ChangeDetector${c}`;
       this._factory = new ChangeDetectorJITGenerator(typeName, this._changeControlStrategy, records,
-        directiveMementos).generate();
+        directiveRecords).generate();
     }
   }
 }
@@ -125,13 +114,13 @@ class ProtoRecordBuilder {
     this.records = [];
   }
 
-  addAst(ast:AST, bindingMemento:any, directiveMemento:any = null, variableBindings:List<any> = null) {
+  addAst(b:BindingRecord, variableBindings:List<any> = null) {
     var last = ListWrapper.last(this.records);
-    if (isPresent(last) && last.directiveMemento == directiveMemento) {
+    if (isPresent(last) && last.bindingRecord.directiveRecord == b.directiveRecord) {
       last.lastInDirective = false;
     }
 
-    var pr = _ConvertAstIntoProtoRecords.convert(ast, bindingMemento, directiveMemento, this.records.length, variableBindings);
+    var pr = _ConvertAstIntoProtoRecords.convert(b, this.records.length, variableBindings);
     if (! ListWrapper.isEmpty(pr)) {
       var last = ListWrapper.last(pr);
       last.lastInBinding = true;
@@ -144,29 +133,27 @@ class ProtoRecordBuilder {
 
 class _ConvertAstIntoProtoRecords implements AstVisitor {
   protoRecords:List<any>;
-  bindingMemento:any;
-  directiveMemento:any;
+  bindingRecord:BindingRecord;
   variableBindings:List<any>;
   contextIndex:number;
   expressionAsString:string;
 
-  constructor(bindingMemento:any, directiveMemento:any, contextIndex:number, expressionAsString:string, variableBindings:List<any>) {
+  constructor(bindingRecord:BindingRecord, contextIndex:number, expressionAsString:string, variableBindings:List<any>) {
     this.protoRecords = [];
-    this.bindingMemento = bindingMemento;
-    this.directiveMemento = directiveMemento;
+    this.bindingRecord = bindingRecord;
     this.contextIndex = contextIndex;
     this.expressionAsString = expressionAsString;
     this.variableBindings = variableBindings;
   }
 
-  static convert(ast:AST, bindingMemento:any, directiveMemento:any, contextIndex:number, variableBindings:List<any>) {
-    var c = new _ConvertAstIntoProtoRecords(bindingMemento, directiveMemento, contextIndex, ast.toString(), variableBindings);
-    ast.visit(c);
+  static convert(b:BindingRecord, contextIndex:number, variableBindings:List<any>) {
+    var c = new _ConvertAstIntoProtoRecords(b, contextIndex, b.ast.toString(), variableBindings);
+    b.ast.visit(c);
     return c.protoRecords;
   }
 
-  visitAssignment(ast:Assignment): AST { return null; }
-  visitChain(ast:Chain): AST { return null; }
+  visitAssignment(ast:Assignment) {}
+  visitChain(ast:Chain) {}
 
   visitImplicitReceiver(ast:ImplicitReceiver) {
     return 0;
@@ -265,7 +252,7 @@ class _ConvertAstIntoProtoRecords implements AstVisitor {
     var selfIndex = ++ this.contextIndex;
     ListWrapper.push(this.protoRecords,
       new ProtoRecord(type, name, funcOrValue, args, fixedArgs, context, selfIndex,
-        this.bindingMemento, this.directiveMemento, this.expressionAsString, false, false));
+        this.bindingRecord, this.expressionAsString, false, false));
     return selfIndex;
   }
 }

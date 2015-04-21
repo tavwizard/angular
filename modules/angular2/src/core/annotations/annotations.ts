@@ -1,6 +1,7 @@
 import {ABSTRACT, CONST, normalizeBlank, isPresent, addAnnotation} from 'angular2/src/facade/lang';
 import {ListWrapper, List} from 'angular2/src/facade/collection';
 import {InjectableAnnotation} from 'angular2/di';
+import {DEFAULT} from 'angular2/change_detection';
 
 // type StringMap = {[idx: string]: string};
 
@@ -86,7 +87,7 @@ import {InjectableAnnotation} from 'angular2/di';
  *
  * @Decorator({
  *   selector: '[dependency]',
- *   bind: {
+ *   properties: {
  *     'id':'dependency'
  *   }
  * })
@@ -232,7 +233,7 @@ import {InjectableAnnotation} from 'angular2/di';
  * This directive would be instantiated with a `Dependency` directive found on the current element. If none can be
  * found, the injector supplies `null` instead of throwing an error.
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 @ABSTRACT()
 export class DirectiveAnnotation extends InjectableAnnotation {
@@ -272,7 +273,8 @@ export class DirectiveAnnotation extends InjectableAnnotation {
   /**
    * Enumerates the set of properties that accept data binding for a directive.
    *
-   * The `bind` property defines a set of `directiveProperty` to `bindingProperty` key-value pairs:
+   * The `properties` property defines a set of `directiveProperty` to `bindingProperty`
+   * key-value pairs:
    *
    * - `directiveProperty` specifies the component property where the value is written.
    * - `bindingProperty` specifies the DOM property where the value is read from.
@@ -285,7 +287,7 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    *
    * ```
    * @Directive({
-   *   bind: {
+   *   properties: {
    *     'directiveProperty1': 'bindingProperty1',
    *     'directiveProperty2': 'bindingProperty2 | pipe1 | ...',
    *     ...
@@ -302,7 +304,7 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    * ```
    * @Decorator({
    *   selector: '[tooltip]',
-   *   bind: {
+   *   properties: {
    *     'text': 'tooltip'
    *   }
    * })
@@ -321,8 +323,8 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    * <div tooltip="Some Text">...</div>
    * ```
    *
-   * Whenever the `someExpression` expression changes, the `bind` declaration instructs Angular to update the
-   * `Tooltip`'s `text` property.
+   * Whenever the `someExpression` expression changes, the `properties` declaration instructs
+   * Angular to update the `Tooltip`'s `text` property.
    *
    *
    *
@@ -336,7 +338,7 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    * ```
    * @Decorator({
    *   selector: '[class-set]',
-   *   bind: {
+   *   properties: {
    *     'classChanges': 'classSet | keyValDiff'
    *   }
    * })
@@ -356,16 +358,42 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    * In this case, the two pipes compose as if they were inlined: `someExpression | somePipe | keyValDiff`.
    *
    */
-  bind:any; //  StringMap
+  properties:any; //  StringMap
 
   /**
-   * Specifies which DOM events a directive listens to.
+   * Enumerates the set of emitted events.
    *
-   * The `events` property defines a set of `event` to `method` key-value pairs:
+   * ## Syntax
+   *
+   * ```
+   * @Component({
+   *   events: ['status-change']
+   * })
+   * class TaskComponent {
+   *   statusChange:EventEmitter;
+   *
+   *   constructor() {
+   *     this.complete = new EventEmitter();
+   *   }
+   *
+   *   onComplete() {
+   *     this.statusChange.next("completed");
+   *   }
+   * }
+   * ```
+   */
+  events:List<string>;
+
+  /**
+   * Specifies which DOM hostListeners a directive listens to.
+   *
+   * The `hostListeners` property defines a set of `event` to `method` key-value pairs:
    *
    * - `event1`: the DOM event that the directive listens to.
    * - `statement`: the statement to execute when the event occurs.
    *
+   * To listen to global events, a target must be added to the event name.
+   * The target can be `window`, `document` or `body`.
    *
    * When writing a directive event binding, you can also refer to the following local variables:
    * - `$event`: Current event object which triggered the event.
@@ -377,8 +405,9 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    *
    * ```
    * @Directive({
-   *   events: {
+   *   hostListeners: {
    *     'event1': 'onMethod1(arguments)',
+   *     'target:event2': 'onMethod2(arguments)',
    *     ...
    *   }
    * }
@@ -386,29 +415,32 @@ export class DirectiveAnnotation extends InjectableAnnotation {
    *
    * ## Basic Event Binding:
    *
-   * Suppose you want to write a directive that triggers on `change` events in the DOM. You would define the event
-   * binding as follows:
+   * Suppose you want to write a directive that triggers on `change` events in the DOM and on `resize` events in window.
+   * You would define the event binding as follows:
    *
    * ```
    * @Decorator({
    *   selector: 'input',
-   *   events: {
-   *     'change': 'onChange($event)'
+   *   hostListeners: {
+   *     'change': 'onChange($event)',
+   *     'window:resize': 'onResize($event)'
    *   }
    * })
    * class InputDecorator {
    *   onChange(event:Event) {
    *   }
+   *   onResize(event:Event) {
+   * }
    * }
    * ```
    *
    * Here the `onChange` method of `InputDecorator` is invoked whenever the DOM element fires the 'change' event.
    *
    */
-  events:any; //  StringMap
+  hostListeners:any; //  StringMap
 
   /**
-   * Specifies a set of lifecycle events in which the directive participates.
+   * Specifies a set of lifecycle hostListeners in which the directive participates.
    *
    * See: [onChange], [onDestroy], [onAllChangesDone] for details.
    */
@@ -417,20 +449,23 @@ export class DirectiveAnnotation extends InjectableAnnotation {
   //@CONST()
   constructor({
     selector = null,
-    bind = null,
+    properties = null,
     events = null,
+    hostListeners = null,
     lifecycle = null
     }:{
     selector?:string,
-    bind?:any,
-    events?: any,
+    properties?:any,
+    events?: List<any>,
+    hostListeners?: any,
     lifecycle?:List<any>
   })
   {
     super();
     this.selector = selector;
-    this.bind = bind;
+    this.properties = properties;
     this.events = events;
+    this.hostListeners = hostListeners;
     this.lifecycle = lifecycle;
   }
 
@@ -446,8 +481,9 @@ export class DirectiveAnnotation extends InjectableAnnotation {
 
 export function Directive(args:{
   selector?:string,
-  bind?:any,
-  events?:any,
+  properties?:any,
+  events?:List<any>,
+  hostListeners?:any,
   lifecycle?:List<any>
 }) {
   return (c) => { addAnnotation(c, new DirectiveAnnotation(args)); }
@@ -456,17 +492,17 @@ export function Directive(args:{
 /**
  * Declare reusable UI building blocks for an application.
  *
- * Each Angular component requires a single `@Component` and at least one `@Template` annotation. The `@Component`
- * annotation specifies when a component is instantiated, and which properties and events it binds to.
+ * Each Angular component requires a single `@Component` and at least one `@View` annotation. The `@Component`
+ * annotation specifies when a component is instantiated, and which properties and hostListeners it binds to.
  *
  * When a component is instantiated, Angular
  * - creates a shadow DOM for the component.
  * - loads the selected template into the shadow DOM.
- * - creates a child [Injector] which is configured with the [Component.services].
+ * - creates a child [Injector] which is configured with the [Component.injectables].
  *
  * All template expressions and statements are then evaluated against the component instance.
  *
- * For details on the `@Template` annotation, see [Template].
+ * For details on the `@View` annotation, see [View].
  *
  * ## Example
  *
@@ -474,8 +510,8 @@ export function Directive(args:{
  * @Component({
  *   selector: 'greet'
  * })
- * @Template({
- *   inline: 'Hello {{name}}!'
+ * @View({
+ *   template: 'Hello {{name}}!'
  * })
  * class Greet {
  *   name: string;
@@ -486,7 +522,7 @@ export function Directive(args:{
  * }
  * ```
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class ComponentAnnotation extends DirectiveAnnotation {
   /**
@@ -503,16 +539,16 @@ export class ComponentAnnotation extends DirectiveAnnotation {
   /**
    * Defines the set of injectable objects that are visible to a Component and its children.
    *
-   * The [services] defined in the Component annotation allow you to configure a set of bindings for the component's
+   * The [injectables] defined in the Component annotation allow you to configure a set of bindings for the component's
    * injector.
    *
    * When a component is instantiated, Angular creates a new child Injector, which is configured with the bindings in
-   * the Component [services] annotation. The injectable objects then become available for injection to the component
+   * the Component [injectables] annotation. The injectable objects then become available for injection to the component
    * itself and any of the directives in the component's template, i.e. they are not available to the directives which
    * are children in the component's light DOM.
    *
    *
-   * The syntax for configuring the [services] injectable is identical to [Injector] injectable configuration. See
+   * The syntax for configuring the [injectables] injectable is identical to [Injector] injectable configuration. See
    * [Injector] for additional detail.
    *
    *
@@ -529,12 +565,12 @@ export class ComponentAnnotation extends DirectiveAnnotation {
    *
    * @Component({
    *   selector: 'greet',
-   *   services: [
+   *   injectables: [
    *     Greeter
    *   ]
    * })
-   * @Template({
-   *   inline: `{{greeter.greet('world')}}!`,
+   * @View({
+   *   template: `{{greeter.greet('world')}}!`,
    *   directives: Child
    * })
    * class HelloWorld {
@@ -546,42 +582,46 @@ export class ComponentAnnotation extends DirectiveAnnotation {
    * }
    * ```
    */
-  services:List<any>;
+  injectables:List<any>;
 
   //@CONST()
   constructor({
     selector = null,
-    bind = null,
+    properties = null,
     events = null,
-    services = null,
+    hostListeners = null,
+	  injectables = null,
     lifecycle = null,
-    changeDetection = null
+    changeDetection = DEFAULT
     }:{
     selector?:string,
-    bind?:Object,
-    events?:Object,
-    services?:List<any>,
+    properties?:Object,
+    events?:List<any>,
+    hostListeners?:Object,
+    injectables?:List<any>,
     lifecycle?:List<any>,
     changeDetection?:string
   })
   {
     super({
       selector: selector,
-      bind: bind,
+      properties: properties,
       events: events,
+      hostListeners: hostListeners,
       lifecycle: lifecycle
     });
 
     this.changeDetection = changeDetection;
-    this.services = services;
+    this.injectables = injectables;
   }
 }
 
 export function Component(args:{
   selector?:string,
-  bind?:Object,
-  events?:Object,
-  services?:List<any>,
+  properties?:Object,
+  events?:List<any>,
+  hostListeners?:Object,
+  injectables?: List<any>,
   lifecycle?:List<any>,
   changeDetection?:string
 }) {
@@ -610,7 +650,7 @@ export function Component(args:{
  * })
  * class DynamicComp {
  *   helloCmp:HelloCmp;
- *   constructor(loader:PrivateComponentLoader, location:PrivateComponentLocation) {
+ *   constructor(loader:DynamicComponentLoader, location:PrivateComponentLocation) {
  *     loader.load(HelloCmp, location).then((helloCmp) => {
  *       this.helloCmp = helloCmp;
  *     });
@@ -620,8 +660,8 @@ export function Component(args:{
  * @Component({
  *   selector: 'hello-cmp'
  * })
- * @Template({
- *   inline: "{{greeting}}"
+ * @View({
+ *   template: "{{greeting}}"
  * })
  * class HelloCmp {
  *   greeting:string;
@@ -633,45 +673,49 @@ export function Component(args:{
  *
  *
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class DynamicComponentAnnotation extends DirectiveAnnotation {
   /**
-   * Same as [Component.services].
+   * Same as [Component.injectables].
    */
   // TODO(vsankin): Please extract into AbstractComponent
-  services:any; //List;
+  injectables:any; //List;
 
   //@CONST()
   constructor({
     selector = null,
-    bind = null,
+    properties = null,
     events = null,
-    services = null,
+    hostListeners = null,
+    injectables,
     lifecycle = null
     }:{
     selector?:string,
-    bind?:Object,
-    events?:Object,
-    services?:List<any>,
+    properties?:Object,
+    events?:List<any>,
+    hostListeners?:Object,
+    injectables?:List<any>,
     lifecycle?:List<any>
   }) {
     super({
       selector: selector,
-      bind: bind,
+      properties: properties,
       events: events,
+      hostListeners: hostListeners,
       lifecycle: lifecycle
     });
 
-    this.services = services;
+    this.injectables = injectables;
   }
 }
 
 export function DynamicComponent(args:{
   selector?:string,
-  bind?:Object,
-  events?:Object,
-  services?:List<any>,
+  properties?:Object,
+  events?:List<any>,
+  hostListeners?:Object,
+  injectables?:List<any>,
   lifecycle?:List<any>
 }) {
   return (c) => { addAnnotation(c, new DynamicComponentAnnotation(args)); }
@@ -700,10 +744,10 @@ export function DynamicComponent(args:{
  * ```
  * @Decorator({
  *   selector: '[tooltip]',
- *   bind: {
+ *   properties: {
  *     'text': 'tooltip'
  *   },
- *   events: {
+ *   hostListeners: {
  *     'onmouseenter': 'onMouseEnter()',
  *     'onmouseleave': 'onMouseLeave()'
  *   }
@@ -735,7 +779,7 @@ export function DynamicComponent(args:{
  * <div tooltip="some text here"></div>
  * ```
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class DecoratorAnnotation extends DirectiveAnnotation {
 
@@ -748,22 +792,25 @@ export class DecoratorAnnotation extends DirectiveAnnotation {
   //@CONST()
   constructor({
     selector = null,
-    bind = null,
+    properties = null,
     events = null,
+    hostListeners = null,
     lifecycle = null,
     compileChildren = true,
     }:{
     selector?:string,
-    bind?:any,
-    events?:any,
+    properties?:any,
+    events?:List<any>,
+    hostListeners?:any,
     lifecycle?:List<any>,
     compileChildren?:boolean
   })
   {
     super({
       selector: selector,
-      bind: bind,
+        properties: properties,
       events: events,
+        hostListeners: hostListeners,
       lifecycle: lifecycle
     });
     this.compileChildren = compileChildren;
@@ -772,8 +819,9 @@ export class DecoratorAnnotation extends DirectiveAnnotation {
 
 export function Decorator(args:{
   selector?:string,
-  bind?:any,
-  events?:any,
+  properties?:any,
+  events?:List<any>,
+  hostListeners?:any,
   lifecycle?:List<any>,
   compileChildren?:boolean
 }) {
@@ -824,7 +872,7 @@ export function Decorator(args:{
  * ```
  * @Viewport({
  *   selector: '[unless]',
- *   bind: {
+ *   properties: {
  *     'condition': 'unless'
  *   }
  * })
@@ -871,26 +919,29 @@ export function Decorator(args:{
  * view occurs on the second `<li></li>` which is a sibling to the `<template>` element.
  *
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class ViewportAnnotation extends DirectiveAnnotation {
   //@CONST()
   constructor({
     selector = null,
-    bind = null,
+    properties = null,
     events = null,
+    hostListeners = null,
     lifecycle = null
     }:{
     selector?:string,
-    bind?:any,
-    events?:any,
+    properties?:any,
+    events?:List<any>,
+    hostListeners?:Object,
     lifecycle?:List<any>
   })
   {
     super({
       selector: selector,
-      bind: bind,
+        properties: properties,
       events: events,
+        hostListeners: hostListeners,
       lifecycle: lifecycle
     });
   }
@@ -898,8 +949,9 @@ export class ViewportAnnotation extends DirectiveAnnotation {
 
 export function Viewport(args:{
   selector?:string,
-  bind?:any,
-  events?:any,
+  properties?:any,
+  events?:List<any>,
+  hostListeners?:Object,
   lifecycle?:List<any>
 }) {
   return (c) => { addAnnotation(c, new ViewportAnnotation(args)); }
@@ -923,7 +975,7 @@ export function Viewport(args:{
  *   }
  * }
  * ```
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export const onDestroy = "onDestroy";
 
@@ -941,7 +993,7 @@ export const onDestroy = "onDestroy";
  * ```
  * @Decorator({
  *   selector: '[class-set]',
- *   bind: {
+ *   properties: {
  *     'propA': 'propA'
  *     'propB': 'propB'
  *   },
@@ -961,7 +1013,7 @@ export const onDestroy = "onDestroy";
  *   }
  * }
  *  ```
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export const onChange = "onChange";
 
@@ -982,6 +1034,6 @@ export const onChange = "onChange";
  *
  * }
  *  ```
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export const onAllChangesDone = "onAllChangesDone";

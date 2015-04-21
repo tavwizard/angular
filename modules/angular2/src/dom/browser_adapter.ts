@@ -1,13 +1,7 @@
 import {List, MapWrapper, ListWrapper} from 'angular2/src/facade/collection';
-import {isPresent} from 'angular2/src/facade/lang';
+import {isBlank, isPresent} from 'angular2/src/facade/lang';
 import {setRootDomAdapter} from './dom_adapter';
 import {GenericBrowserDomAdapter} from './generic_browser_adapter';
-
-var _attrToPropMap = {
-  'innerHtml': 'innerHTML',
-  'readonly': 'readOnly',
-  'tabindex': 'tabIndex'
-};
 
 declare var MouseEvent: {
   prototype: MouseEvent;
@@ -20,6 +14,55 @@ declare var Event: {
   CAPTURING_PHASE: number;
   AT_TARGET: number;
   BUBBLING_PHASE: number;
+};
+
+var _attrToPropMap = {
+  'innerHtml': 'innerHTML',
+  'readonly': 'readOnly',
+  'tabindex': 'tabIndex'
+};
+
+const DOM_KEY_LOCATION_NUMPAD = 3;
+
+// Map to convert some key or keyIdentifier values to what will be returned by getEventKey
+var _keyMap = {
+  // The following values are here for cross-browser compatibility and to match the W3C standard
+  // cf http://www.w3.org/TR/DOM-Level-3-Events-key/
+  '\b': 'Backspace',
+  '\t': 'Tab',
+  '\x7F': 'Delete',
+  '\x1B': 'Escape',
+  'Del': 'Delete',
+  'Esc': 'Escape',
+  'Left': 'ArrowLeft',
+  'Right': 'ArrowRight',
+  'Up': 'ArrowUp',
+  'Down':'ArrowDown',
+  'Menu': 'ContextMenu',
+  'Scroll' : 'ScrollLock',
+  'Win': 'OS'
+};
+
+// There is a bug in Chrome for numeric keypad keys:
+// https://code.google.com/p/chromium/issues/detail?id=155654
+// 1, 2, 3 ... are reported as A, B, C ...
+var _chromeNumKeyPadMap = {
+  'A': '1',
+  'B': '2',
+  'C': '3',
+  'D': '4',
+  'E': '5',
+  'F': '6',
+  'G': '7',
+  'H': '8',
+  'I': '9',
+  'J': '*',
+  'K': '+',
+  'M': '-',
+  'N': '.',
+  'O': '/',
+  '\x60': '0',
+  '\x90': 'NumLock'
 };
 
 export class BrowserDomAdapter extends GenericBrowserDomAdapter {
@@ -42,6 +85,12 @@ export class BrowserDomAdapter extends GenericBrowserDomAdapter {
   }
   on(el, evt, listener) {
     el.addEventListener(evt, listener, false);
+  }
+  onAndCancel(el, evt, listener): Function {
+    el.addEventListener(evt, listener, false);
+    //Needed to follow Dart's subscription semantic, until fix of
+    //https://code.google.com/p/dart/issues/detail?id=17406
+    return () => {el.removeEventListener(evt, listener, false);};
   }
   dispatchEvent(el, evt) {
     el.dispatchEvent(evt);
@@ -169,11 +218,11 @@ export class BrowserDomAdapter extends GenericBrowserDomAdapter {
     style.innerText = css;
     return <HTMLStyleElement>style;
   }
-  createShadowRoot(el:any): any {
-    return el.createShadowRoot();
+  createShadowRoot(el:HTMLElement): any /*ShadowRoot*/ {
+    return (<any>el).createShadowRoot();
   }
-  getShadowRoot(el:any): any {
-    return el.shadowRoot;
+  getShadowRoot(el:HTMLElement): any /*ShadowRoot*/ {
+    return (<any>el).shadowRoot;
   }
   getHost(el:HTMLElement): HTMLElement {
     return <HTMLElement>(<any>el).host;
@@ -241,6 +290,9 @@ export class BrowserDomAdapter extends GenericBrowserDomAdapter {
   defaultDoc() {
     return document;
   }
+  getBoundingClientRect(el) {
+    return el.getBoundingClientRect();
+  }
   getTitle() {
     return document.title;
   }
@@ -296,5 +348,38 @@ export class BrowserDomAdapter extends GenericBrowserDomAdapter {
   }
   getHref(el:Element): string {
     return <string>(<any>el).href;
+  }
+  getEventKey(event): string {
+    var key = event.key;
+    if (isBlank(key)) {
+      key = event.keyIdentifier;
+      // keyIdentifier is defined in the old draft of DOM Level 3 Events implemented by Chrome and Safari
+      // cf http://www.w3.org/TR/2007/WD-DOM-Level-3-Events-20071221/events.html#Events-KeyboardEvents-Interfaces
+      if (isBlank(key)) {
+        return 'Unidentified';
+      }
+      if (key.startsWith('U+')) {
+        key = String.fromCharCode(parseInt(key.substring(2), 16));
+        if (event.location === DOM_KEY_LOCATION_NUMPAD && _chromeNumKeyPadMap.hasOwnProperty(key)) {
+          // There is a bug in Chrome for numeric keypad keys:
+          // https://code.google.com/p/chromium/issues/detail?id=155654
+          // 1, 2, 3 ... are reported as A, B, C ...
+          key = _chromeNumKeyPadMap[key];
+        }
+      }
+    }
+    if (_keyMap.hasOwnProperty(key)) {
+      key = _keyMap[key];
+    }
+    return key;
+  }
+  getGlobalEventTarget(target:string):any {
+    if (target == "window") {
+      return window;
+    } else if (target == "document") {
+      return document;
+    } else if (target == "body") {
+      return document.body;
+    }
   }
 }

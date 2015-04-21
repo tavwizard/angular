@@ -16,13 +16,14 @@ import 'package:angular2/src/transform/common/asset_reader.dart';
 import 'package:angular2/src/transform/common/logging.dart';
 import 'package:angular2/src/transform/common/names.dart';
 import 'package:angular2/src/transform/common/parser.dart';
+import 'package:angular2/src/transform/common/property_utils.dart' as prop;
 import 'package:barback/barback.dart';
 import 'package:code_transformers/assets.dart';
 
 import 'recording_reflection_capabilities.dart';
 
 /// Reads the `.ng_deps.dart` file represented by `entryPoint` and parses any
-/// Angular 2 `Template` annotations it declares to generate `getter`s,
+/// Angular 2 `View` annotations it declares to generate `getter`s,
 /// `setter`s, and `method`s that would otherwise be reflectively accessed.
 ///
 /// This method assumes a [DomAdapter] has been registered.
@@ -63,24 +64,41 @@ Future<String> processTemplates(AssetReader reader, AssetId entryPoint) async {
 
 Iterable<String> _generateGetters(String typeName, List<String> getterNames) {
   // TODO(kegluneq): Include `typeName` where possible.
-  return getterNames.map((prop) => '''
-        '$prop': (o) => o.$prop
-    ''');
+  return getterNames.map((getterName) {
+    if (!prop.isValid(getterName)) {
+      // TODO(kegluenq): Eagerly throw here once #1295 is addressed.
+      return prop.lazyInvalidGetter(getterName);
+    } else {
+      return ''' '${prop.sanitize(getterName)}': (o) => o.$getterName''';
+    }
+  });
 }
 
 Iterable<String> _generateSetters(String typeName, List<String> setterName) {
-  return setterName.map((prop) => '''
-      '$prop': (o, v) => o.$prop = v
-  ''');
+  return setterName.map((setterName) {
+    if (!prop.isValid(setterName)) {
+      // TODO(kegluenq): Eagerly throw here once #1295 is addressed.
+      return prop.lazyInvalidSetter(setterName);
+    } else {
+      return ''' '${prop.sanitize(setterName)}': '''
+          ''' (o, v) => o.$setterName = v ''';
+    }
+  });
 }
 
 Iterable<String> _generateMethods(String typeName, List<String> methodNames) {
-  return methodNames.map((methodName) => '''
-      '$methodName': (o, List args) => Function.apply(o.$methodName, args)
-  ''');
+  return methodNames.map((methodName) {
+    if (!prop.isValid(methodName)) {
+      // TODO(kegluenq): Eagerly throw here once #1295 is addressed.
+      return prop.lazyInvalidMethod(methodName);
+    } else {
+      return ''' '${prop.sanitize(methodName)}': '''
+          '(o, List args) => Function.apply(o.$methodName, args) ';
+    }
+  });
 }
 
-/// Extracts `inline` and `url` values from `Template` annotations, reads
+/// Extracts `template` and `url` values from `View` annotations, reads
 /// template code if necessary, and determines what values will be
 /// reflectively accessed from that template.
 class _TemplateExtractor {
@@ -131,7 +149,7 @@ class _TemplateExtractor {
     return toReturn;
   }
 
-  // TODO(kegluneq): Rewrite these to `inline` where possible.
+  // TODO(kegluneq): Rewrite these to `template` where possible.
   // See [https://github.com/angular/angular/issues/1035].
   Future<String> _readUrlTemplate(String url) async {
     var assetId = uriToAssetId(_entryPoint, url, logger, null);
@@ -165,7 +183,7 @@ class _TemplateExtractVisitor extends Object with RecursiveAstVisitor<Object> {
       return null;
     }
     var keyString = '${node.name.label}';
-    if (keyString == 'inline' || keyString == 'url') {
+    if (keyString == 'template' || keyString == 'templateUrl') {
       if (node.expression is! SimpleStringLiteral) {
         logger.error(
             'Angular 2 currently only supports string literals in directives.'
@@ -173,7 +191,7 @@ class _TemplateExtractVisitor extends Object with RecursiveAstVisitor<Object> {
         return null;
       }
       var valueString = stringLiteralToString(node.expression);
-      if (keyString == 'url') {
+      if (keyString == 'templateUrl') {
         urlValues.add(valueString);
       } else {
         inlineValues.add(valueString);

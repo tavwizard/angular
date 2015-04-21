@@ -1,7 +1,7 @@
 import {int, FINAL} from 'angular2/src/facade/lang';
 import {reflector} from 'angular2/src/reflection/reflection';
 import {getIntParameter, bindAction} from 'angular2/src/test_lib/benchmark_util';
-import {Component, Viewport, Template, ViewContainer, Compiler}
+import {Component, Viewport, View, ViewContainer, Compiler}
     from 'angular2/angular2';
 import {PromiseWrapper} from 'angular2/src/facade/async';
 import {ListWrapper, MapWrapper} from 'angular2/src/facade/collection';
@@ -14,6 +14,26 @@ import {generateOfferings} from './random_data';
 import {ScrollItemComponent} from './scroll_item';
 import {For} from 'angular2/directives';
 
+@Component({
+  selector: 'scroll-area',
+})
+@View({
+  directives: [ScrollItemComponent, For],
+  template: `
+    <div>
+        <div id="scrollDiv"
+             [style]="scrollDivStyle"
+             on-scroll="onScroll($event)">
+            <div id="padding"></div>
+            <div id="inner">
+                <scroll-item
+                    template="for #item of visibleItems"
+                    [offering]="item">
+                </scroll-item>
+            </div>
+        </div>
+    </div>`
+})
 export class ScrollAreaComponent {
   _fullList:List<Offering>;
   visibleItems:List<Offering>;
@@ -58,33 +78,4 @@ export class ScrollAreaComponent {
     }
     this.visibleItems = ListWrapper.slice(this._fullList, iStart, iEnd);
   }
-}
-
-export function setupReflectorForScrollArea() {
-  reflector.registerType(ScrollAreaComponent, {
-    'factory': () => new ScrollAreaComponent(),
-    'parameters': [],
-    'annotations': [
-      new Component({
-        selector: 'scroll-area',
-      }),
-      new Template({
-        directives: [ScrollItemComponent, For],
-        inline: `
-          <div>
-              <div id="scrollDiv"
-                   [style]="scrollDivStyle"
-                   on-scroll="onScroll($event)">
-                  <div id="padding"></div>
-                  <div id="inner">
-                      <scroll-item
-                          template="for #item of visibleItems"
-                          [offering]="item">
-                      </scroll-item>
-                  </div>
-              </div>
-          </div>`
-      })
-    ]
-  });
 }

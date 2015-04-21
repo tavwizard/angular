@@ -13,8 +13,8 @@ void initReflector(reflector) {
       'parameters': const [],
       'annotations': const [
         const Decorator(
-            selector: '[tool-tip]', bind: const {'text': 'tool-tip'})
+            selector: '[tool-tip]', properties: const {'text': 'tool-tip'})
       ]
     })
-    ..registerSetters({'text': (o, String v) => o.text = v});
+    ..registerSetters({'text': (o, v) => o.text = v});
 }

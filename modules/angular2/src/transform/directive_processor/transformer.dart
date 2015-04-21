@@ -2,6 +2,8 @@ library angular2.transform.directive_processor.transformer;
 
 import 'dart:async';
 
+import 'package:angular2/src/transform/common/asset_reader.dart';
+import 'package:angular2/src/transform/common/classdef_parser.dart';
 import 'package:angular2/src/transform/common/logging.dart' as log;
 import 'package:angular2/src/transform/common/names.dart';
 import 'package:angular2/src/transform/common/options.dart';
@@ -14,7 +16,7 @@ import 'rewriter.dart';
 /// reflector.
 ///
 /// This will also create .ng_deps.dart files for classes annotated
-/// with @Component, @Template, @Decorator, etc.
+/// with @Component, @View, @Decorator, etc.
 ///
 /// This transformer is the first phase in a two-phase transform. It should
 /// be followed by [DirectiveLinker].
@@ -32,8 +34,10 @@ class DirectiveProcessor extends Transformer {
 
     try {
       var asset = transform.primaryInput;
+      var reader = new AssetReader.fromTransform(transform);
+      var defMap = await createTypeMap(reader, asset.id);
       var assetCode = await asset.readAsString();
-      var ngDepsSrc = createNgDeps(assetCode, asset.id.path);
+      var ngDepsSrc = createNgDeps(assetCode, asset.id.path, defMap);
       if (ngDepsSrc != null && ngDepsSrc.isNotEmpty) {
         var ngDepsAssetId =
             transform.primaryInput.id.changeExtension(DEPS_EXTENSION);

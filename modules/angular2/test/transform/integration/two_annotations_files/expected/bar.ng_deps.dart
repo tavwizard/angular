@@ -2,9 +2,9 @@ library bar.ng_deps.dart;
 
 import 'bar.dart';
 import 'package:angular2/src/core/annotations/annotations.dart';
-import 'package:angular2/src/core/annotations/template.dart';
-import 'package:angular2/src/core/annotations/template.ng_deps.dart' as i0;
-import 'package:angular2/src/core/annotations/annotations.ng_deps.dart' as i1;
+import 'package:angular2/src/core/annotations/annotations.ng_deps.dart' as i0;
+import 'package:angular2/src/core/annotations/view.dart';
+import 'package:angular2/src/core/annotations/view.ng_deps.dart' as i1;
 
 bool _visited = false;
 void initReflector(reflector) {
@@ -16,7 +16,7 @@ void initReflector(reflector) {
       'parameters': const [],
       'annotations': const [
         const Component(selector: '[soup]'),
-        const Template(inline: 'Salad')
+        const View(template: 'Salad')
       ]
     });
   i0.initReflector(reflector);

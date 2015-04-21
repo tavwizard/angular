@@ -1,4 +1,4 @@
-import {bootstrap, Component, Decorator, Template, If, For, EventEmitter} from 'angular2/angular2';
+import {bootstrap, Component, Decorator, View, If, For, EventEmitter} from 'angular2/angular2';
 import {FormBuilder, Validators, FormDirectives, ControlGroup} from 'angular2/forms';
 
 // HeaderFields renders the bound header control group. It can used as follows:
@@ -8,12 +8,12 @@ import {FormBuilder, Validators, FormDirectives, ControlGroup} from 'angular2/fo
 // This component is self-contained and can be tested in isolation.
 @Component({
   selector: 'survey-header',
-  bind: {
+  properties: {
     "header" : "header"
   }
 })
-@Template({
-  inline: `
+@View({
+  template: `
       <div [control-group]="header">
         <div>
           <label>Title:</label> <br/>
@@ -53,13 +53,14 @@ class HeaderFields {
 // This component is self-contained and can be tested in isolation.
 @Component({
   selector: 'survey-question',
-  bind: {
+  events: ['destroy'],
+  properties: {
     "question" : "question",
     "index" : "index"
   }
 })
-@Template({
-  inline: `
+@View({
+  template: `
       <h2>Question #{{index}}</h2>
 
       <button (click)="deleteQuestion()">Delete</button>
@@ -100,16 +101,16 @@ class HeaderFields {
 class SurveyQuestion {
   question:ControlGroup;
   index:number;
-  onDelete:Function;
+  destroy:EventEmitter;
 
-  constructor(@EventEmitter("delete") onDelete:Function) {
-    this.onDelete = onDelete;
+  constructor() {
+    this.destroy = new EventEmitter();
   }
 
   deleteQuestion() {
     // Invoking an injected event emitter will fire an event,
     // which in this case will result in calling `deleteQuestion(i)`
-    this.onDelete();
+    this.destroy.next(null);
   }
 }
 
@@ -118,10 +119,10 @@ class SurveyQuestion {
 // SurveyBuilder is a form that allows you to create a survey.
 @Component({
   selector: 'survey-builder-app',
-  services: [FormBuilder]
+  injectables: [FormBuilder]
 })
-@Template({
-  inline: `
+@View({
+  template: `
     <h1>Create New Survey</h1>
 
     <div [control-group]="form">
@@ -132,7 +133,7 @@ class SurveyQuestion {
           *for="var q of form.controls.questions.controls; var i=index"
           [question]="q"
           [index]="i + 1"
-          (delete)="deleteQuestion(i)">
+          (destroy)="destroyQuestion(i)">
       </survey-question>
 
       <button (click)="submitForm()">Submit</button>
@@ -175,14 +176,14 @@ class SurveyBuilder {
     // complex form interactions in a declarative fashion.
     //
     // We are disabling the responseLength control when the question type is checkbox.
-    newQuestion.controls.type.valueChanges.subscribe((v) =>
-      v == 'text' || v == 'textarea' ?
-        newQuestion.include('responseLength') : newQuestion.exclude('responseLength'));
+    newQuestion.controls.type.valueChanges.observer({
+      next: (v) => v == 'text' || v == 'textarea' ? newQuestion.include('responseLength') : newQuestion.exclude('responseLength')
+    });
 
     this.form.controls.questions.push(newQuestion);
   }
 
-  deleteQuestion(index:number) {
+  destroyQuestion(index:number) {
     this.form.controls.questions.removeAt(index);
   }
 

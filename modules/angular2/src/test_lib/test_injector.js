@@ -2,12 +2,15 @@ import {bind} from 'angular2/di';
 
 import {Compiler, CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {Reflector, reflector} from 'angular2/src/reflection/reflection';
-import {Parser, Lexer, ChangeDetection, dynamicChangeDetection} from 'angular2/change_detection';
+import {Parser, Lexer, ChangeDetection, DynamicChangeDetection,
+  PipeRegistry, defaultPipeRegistry} from 'angular2/change_detection';
 import {ExceptionHandler} from 'angular2/src/core/exception_handler';
 import {TemplateLoader} from 'angular2/src/render/dom/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
-import {ShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
+import {DynamicComponentLoader} from 'angular2/src/core/compiler/dynamic_component_loader';
+import {ShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/shadow_dom_strategy';
+import {EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/emulated_unscoped_shadow_dom_strategy';
 import {XHR} from 'angular2/src/services/xhr';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {UrlResolver} from 'angular2/src/services/url_resolver';
@@ -32,12 +35,21 @@ import {Injector} from 'angular2/di';
 import {List, ListWrapper} from 'angular2/src/facade/collection';
 import {FunctionWrapper} from 'angular2/src/facade/lang';
 
+import {ViewFactory, VIEW_POOL_CAPACITY} from 'angular2/src/core/compiler/view_factory';
+import {AppViewHydrator} from 'angular2/src/core/compiler/view_hydrator';
+import {ProtoViewFactory} from 'angular2/src/core/compiler/proto_view_factory';
+import {Renderer} from 'angular2/src/render/api';
+import {DirectDomRenderer} from 'angular2/src/render/dom/direct_dom_renderer';
+import * as rc from 'angular2/src/render/dom/compiler/compiler';
+import * as rvf from 'angular2/src/render/dom/view/view_factory';
+import * as rvh from 'angular2/src/render/dom/view/view_hydrator';
+
 /**
  * Returns the root injector bindings.
  *
  * This must be kept in sync with the _rootBindings in application.js
  *
- * @returns {*[]}
+ * @returns {any[]}
  */
 function _getRootBindings() {
   return [
@@ -50,7 +62,7 @@ function _getRootBindings() {
  *
  * This must be kept in sync with _injectorBindings() in application.js
  *
- * @returns {*[]}
+ * @returns {any[]}
  */
 function _getAppBindings() {
   var appDoc;
@@ -67,11 +79,22 @@ function _getAppBindings() {
     bind(ShadowDomStrategy).toFactory(
         (styleUrlResolver, doc) => new EmulatedUnscopedShadowDomStrategy(styleUrlResolver, doc.head),
         [StyleUrlResolver, appDocumentToken]),
+    bind(Renderer).toClass(DirectDomRenderer),
+    bind(rc.Compiler).toClass(rc.DefaultCompiler),
+    rvf.ViewFactory,
+    rvh.RenderViewHydrator,
+    bind(rvf.VIEW_POOL_CAPACITY).toValue(500),
+    ProtoViewFactory,
+    ViewFactory,
+    AppViewHydrator,
+    bind(VIEW_POOL_CAPACITY).toValue(500),
     Compiler,
     CompilerCache,
     bind(TemplateResolver).toClass(MockTemplateResolver),
-    bind(ChangeDetection).toValue(dynamicChangeDetection),
+    bind(PipeRegistry).toValue(defaultPipeRegistry),
+    bind(ChangeDetection).toClass(DynamicChangeDetection),
     TemplateLoader,
+    DynamicComponentLoader,
     DirectiveMetadataReader,
     Parser,
     Lexer,
@@ -93,8 +116,8 @@ function _getAppBindings() {
 }
 
 export function createTestInjector(bindings: List) {
-  var rootInjector = new Injector(_getRootBindings());
-  return rootInjector.createChild(ListWrapper.concat(_getAppBindings(), bindings));
+  var rootInjector = Injector.resolveAndCreate(_getRootBindings());
+  return rootInjector.resolveAndCreateChild(ListWrapper.concat(_getAppBindings(), bindings));
 }
 
 /**
@@ -125,6 +148,7 @@ export function createTestInjector(bindings: List) {
  * @param {Array} tokens
  * @param {Function} fn
  * @return {FunctionWithParamTokens}
+ * @exportedAs angular2/test
  */
 export function inject(tokens: List, fn: Function) {
   return new FunctionWithParamTokens(tokens, fn);

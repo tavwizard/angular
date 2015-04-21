@@ -1,4 +1,4 @@
-import {int, isBlank, BaseException} from 'angular2/src/facade/lang';
+import {int, isBlank, isPresent, BaseException} from 'angular2/src/facade/lang';
 import * as eiModule from './element_injector';
 import {DirectiveBinding} from './element_injector';
 import {List, StringMap} from 'angular2/src/facade/collection';
@@ -8,11 +8,8 @@ export class ElementBinder {
   protoElementInjector:eiModule.ProtoElementInjector;
   componentDirective:DirectiveBinding;
   viewportDirective:DirectiveBinding;
-  textNodeIndices:List<int>;
-  hasElementPropertyBindings:boolean;
-  nestedProtoView: viewModule.ProtoView;
-  events:StringMap;
-  contentTagSelector:string;
+  nestedProtoView: viewModule.AppProtoView;
+  hostListeners:StringMap;
   parent:ElementBinder;
   index:int;
   distanceToParent:int;
@@ -31,14 +28,16 @@ export class ElementBinder {
     this.index = index;
     this.distanceToParent = distanceToParent;
     // updated later when events are bound
-    this.events = null;
-    // updated later when text nodes are bound
-    this.textNodeIndices = null;
-    // updated later when element properties are bound
-    this.hasElementPropertyBindings = false;
+    this.hostListeners = null;
     // updated later, so we are able to resolve cycles
     this.nestedProtoView = null;
-    // updated later in the compilation pipeline
-    this.contentTagSelector = null;
+  }
+
+  hasStaticComponent() {
+    return isPresent(this.componentDirective) && isPresent(this.nestedProtoView);
+  }
+
+  hasDynamicComponent() {
+    return isPresent(this.componentDirective) && isBlank(this.nestedProtoView);
   }
 }

@@ -16,7 +16,7 @@ import {DOM} from 'angular2/src/dom/dom_adapter';
 
 import {Inject} from 'angular2/di';
 
-import {Component, Decorator, Template, PropertySetter} from 'angular2/angular2';
+import {Component, Decorator, View, PropertySetter} from 'angular2/angular2';
 
 import {TestBed} from 'angular2/src/test_lib/test_bed';
 
@@ -25,8 +25,8 @@ import {ControlGroupDirective, ControlDirective, Control, ControlGroup, Optional
   DefaultValueAccessor, Validators} from 'angular2/forms';
 
 export function main() {
-  if (DOM.supportsDOMEvents()) {
-    describe("integration tests", () => {
+  describe("integration tests", () => {
+    if (DOM.supportsDOMEvents()) {
       it("should initialize DOM elements with the given form object",
         inject([TestBed, AsyncTestCompleter], (tb, async) => {
         var ctx = new MyComp(new ControlGroup({
@@ -362,12 +362,12 @@ export function main() {
           });
         }));
       });
-    });
-  }
+    }
+  });
 }
 
 @Component({selector: "my-comp"})
-@Template({directives: [
+@View({directives: [
   ControlGroupDirective,
   ControlDirective,
   WrappedValue,
@@ -386,7 +386,7 @@ class MyComp {
 
 @Decorator({
   selector:'[wrapped-value]',
-  events: {
+  hostListeners: {
     'change' : 'handleOnChange($event.target.value)'
   }
 })

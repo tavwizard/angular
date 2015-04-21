@@ -1,3 +1,6 @@
 /**
- * Define public API for Angular here.
+ * @module
+ * @public
+ * @description
+ * This module provides advanced support for extending change detection.
  */

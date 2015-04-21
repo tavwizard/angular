@@ -40,9 +40,12 @@ export class AbstractAnnotation {}
 export function ABSTRACT() {
   return (c) => { addAnnotation(c, new AbstractAnnotation()); }
 }
-export class ImplementsAnnotation {}
-export function IMPLEMENTS() {
-  return (c) => { addAnnotation(c, new ImplementsAnnotation()); }
+export class ImplementsAnnotation {
+  _type: Type;
+  constructor(t?:Type) { this._type = t; }
+}
+export function IMPLEMENTS(t?:Type) {
+  return (c) => { addAnnotation(c, new ImplementsAnnotation(t)); }
 }
 
 export function isPresent(obj): boolean {

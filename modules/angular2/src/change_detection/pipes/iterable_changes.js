@@ -21,13 +21,13 @@ export class IterableChangesFactory {
     return IterableChanges.supportsObj(obj);
   }
 
-  create(bpc):Pipe {
+  create(cdRef):Pipe {
     return new IterableChanges();
   }
 }
 
 /**
- * @publicModule angular2/pipes
+ * @exportedAs angular2/pipes
  */
 export class IterableChanges extends Pipe {
   _collection;
@@ -505,7 +505,7 @@ export class IterableChanges extends Pipe {
 }
 
 /**
- * @publicModule angular2/pipes
+ * @exportedAs angular2/pipes
  */
 export class CollectionChangeRecord  {
   currentIndex:int;

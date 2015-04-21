@@ -2,25 +2,13 @@ import {CONST} from 'angular2/src/facade/lang';
 import {DependencyAnnotation} from 'angular2/di';
 
 /**
- * The directive can inject an emitter function that would emit events onto the
- * directive host element.
- */
-export class EventEmitter extends DependencyAnnotation {
-  eventName: string;
-  @CONST()
-  constructor(eventName) {
-    super();
-    this.eventName = eventName;
-  }
-
-  get token() {
-    return Function;
-  }
-}
-
-/**
- * The directive can inject a property setter that would allow setting this property on the
- * host element
+ * Specifies that a function for setting host properties should be injected.
+ *
+ * NOTE: This is changing pre 1.0.
+ *
+ * The directive can inject a property setter that would allow setting this property on the host element.
+ *
+ * @exportedAs angular2/annotations
  */
 export class PropertySetter extends DependencyAnnotation {
   propName: string;
@@ -36,7 +24,32 @@ export class PropertySetter extends DependencyAnnotation {
 }
 
 /**
- * The directive can inject the value of an attribute of the host element
+ * Specifies that a constant attribute value should be injected.
+ *
+ * The directive can inject constant string literals of host element attributes.
+ *
+ * ## Example
+ *
+ * Suppose we have an `<input>` element and want to know its `type`.
+ *
+ * ```html
+ * <input type="text">
+ * ```
+ *
+ * A decorator can inject string literal `text` like so:
+ *
+ * ```javascript
+ * @Decorator({
+ *   selector: `input'
+ * })
+ * class InputDecorator {
+ *   constructor(@Attribute('type') type) {
+ *     // type would be `text` in this example
+ *   }
+ * }
+ * ```
+ *
+ * @exportedAs angular2/annotations
  */
 export class Attribute extends DependencyAnnotation {
   attributeName: string;
@@ -52,5 +65,21 @@ export class Attribute extends DependencyAnnotation {
     //so we use instance of Attribute instead. This doesn't matter much in practice as arguments
     //with @Attribute annotation are injected by ElementInjector that doesn't take tokens into account.
     return this;
+  }
+}
+
+/**
+ * Specifies that a [QueryList] should be injected.
+ *
+ * See: [QueryList] for usage and example.
+ *
+ * @exportedAs angular2/annotations
+ */
+export class Query extends DependencyAnnotation {
+  directive;
+  @CONST()
+  constructor(directive) {
+    super();
+    this.directive = directive;
   }
 }

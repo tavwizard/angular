@@ -6,7 +6,7 @@ import {CompilePipeline} from 'angular2/src/render/dom/compiler/compile_pipeline
 import {CompileStep} from 'angular2/src/render/dom/compiler/compile_step';
 import {CompileElement} from 'angular2/src/render/dom/compiler/compile_element';
 import {CompileControl} from 'angular2/src/render/dom/compiler/compile_control';
-import {Template, DirectiveMetadata} from 'angular2/src/render/api';
+import {ViewDefinition, DirectiveMetadata} from 'angular2/src/render/api';
 import {Lexer, Parser} from 'angular2/change_detection';
 
 export function main() {
@@ -23,7 +23,8 @@ export function main() {
         someDecorator,
         someDecoratorIgnoringChildren,
         someDecoratorWithProps,
-        someDecoratorWithEvents
+        someDecoratorWithEvents,
+        someDecoratorWithGlobalEvents
       ];
       parser = new Parser(new Lexer());
     });
@@ -130,17 +131,32 @@ export function main() {
         el('<div some-decor-events></div>')
       );
       var directiveBinding = results[0].directives[0];
-      expect(MapWrapper.get(directiveBinding.eventBindings, 'click').source)
-        .toEqual('doIt()');
+      expect(directiveBinding.eventBindings.length).toEqual(1);
+      var eventBinding = directiveBinding.eventBindings[0];
+      expect(eventBinding.fullName).toEqual('click');
+      expect(eventBinding.source.source).toEqual('doIt()');
     });
 
+    it('should bind directive global events', () => {
+      var results = process(
+        el('<div some-decor-globalevents></div>')
+      );
+      var directiveBinding = results[0].directives[0];
+      expect(directiveBinding.eventBindings.length).toEqual(1);
+      var eventBinding = directiveBinding.eventBindings[0];
+      expect(eventBinding.fullName).toEqual('window:resize');
+      expect(eventBinding.source.source).toEqual('doItGlobal()');
+    });
+
+    //TODO: assertions should be enabled when running tests: https://github.com/angular/angular/issues/1340
     describe('viewport directives', () => {
       it('should not allow multiple viewport directives on the same element', () => {
         expect( () => {
           process(
             el('<template some-vp some-vp2></template>')
           );
-        }).toThrowError('Only one viewport directive is allowed per element - check <template some-vp some-vp2>');
+        }).toThrowError('Only one viewport directive is allowed per element - check '
+          + (assertionsEnabled() ? '<template some-vp some-vp2>' : 'null'));
       });
 
       it('should not allow viewport directives on non <template> elements', () => {
@@ -148,10 +164,12 @@ export function main() {
           process(
             el('<div some-vp></div>')
           );
-        }).toThrowError('Viewport directives need to be placed on <template> elements or elements with template attribute - check <div some-vp>');
+        }).toThrowError('Viewport directives need to be placed on <template> elements or elements with template attribute - check ' 
+          + (assertionsEnabled() ? '<div some-vp>' : 'null'));
       });
     });
 
+    //TODO: assertions should be enabled when running tests: https://github.com/angular/angular/issues/1340
     describe('component directives', () => {
       it('should save the component id', () => {
         var results = process(
@@ -165,7 +183,8 @@ export function main() {
            process(
              el('<div some-comp some-comp2></div>')
            );
-         }).toThrowError('Only one component directive is allowed per element - check <div some-comp some-comp2>');
+         }).toThrowError('Only one component directive is allowed per element - check '
+          + (assertionsEnabled() ? '<div some-comp some-comp2>' : 'null'));
       });
 
       it('should not allow component directives on <template> elements', () => {
@@ -173,7 +192,8 @@ export function main() {
            process(
              el('<template some-comp></template>')
            );
-         }).toThrowError('Only template directives are allowed on template elements - check <template some-comp>');
+         }).toThrowError('Only template directives are allowed on template elements - check '
+          + (assertionsEnabled() ? '<template some-comp>' : 'null'));
        });
     });
 
@@ -232,7 +252,7 @@ var someDecoratorIgnoringChildren = new DirectiveMetadata({
 
 var someDecoratorWithProps = new DirectiveMetadata({
   selector: '[some-decor-props]',
-  bind: MapWrapper.createFromStringMap({
+  properties: MapWrapper.createFromStringMap({
     'dirProp': 'elProp',
     'doubleProp': 'elProp | double'
   }),
@@ -242,7 +262,14 @@ var someDecoratorWithProps = new DirectiveMetadata({
 
 var someDecoratorWithEvents = new DirectiveMetadata({
   selector: '[some-decor-events]',
-  events: MapWrapper.createFromStringMap({
+  hostListeners: MapWrapper.createFromStringMap({
     'click': 'doIt()'
+  })
+});
+
+var someDecoratorWithGlobalEvents = new DirectiveMetadata({
+  selector: '[some-decor-globalevents]',
+  hostListeners: MapWrapper.createFromStringMap({
+    'window:resize': 'doItGlobal()'
   })
 });

@@ -4,7 +4,25 @@ import * as modelModule from './model';
 
 
 /**
- * @publicModule angular2/forms
+ * Creates a form object from a user-specified configuration.
+ *
+ * # Example
+ *
+ * This example creates a [ControlGroup] that consists of a `login` [Control], and a nested [ControlGroup] that defines
+ * a `password` and a `passwordConfirmation` [Control].
+ *
+ * ```
+ *  var loginForm = builder.group({
+ *    login: ["", Validators.required],
+ *
+ *    passwordRetry: builder.group({
+ *      password: ["", Validators.required],
+ *      passwordConfirmation: ["", Validators.required]
+ *    })
+ *  });
+ *
+ *  ```
+ * @exportedAs angular2/forms
  */
 export class FormBuilder {
   group(controlsConfig, extra = null):modelModule.ControlGroup {

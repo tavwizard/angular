@@ -86,6 +86,9 @@ export class Parse5DomAdapter extends DomAdapter {
   on(el, evt, listener) {
     //Do nothing, in order to not break forms integration tests
   }
+  onAndCancel(el, evt, listener): Function {
+    //Do nothing, in order to not break forms integration tests
+  }
   dispatchEvent(el, evt) {
     throw _notImplemented('dispatchEvent');
   }
@@ -376,6 +379,9 @@ export class Parse5DomAdapter extends DomAdapter {
       StringMapWrapper.set(defDoc, "head", treeAdapter.createElement("head", null, []));
     }
     return defDoc;
+  }
+  getBoundingClientRect(el) {
+    return {left: 0, top: 0, width: 0, height: 0};
   }
   getTitle() {
     return this.defaultDoc().title || "";

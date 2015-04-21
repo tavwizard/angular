@@ -1,16 +1,12 @@
-import {
-  el
-} from 'angular2/test_lib';
-
 import {isBlank, isPresent, BaseException} from 'angular2/src/facade/lang';
-import {MapWrapper, ListWrapper, List} from 'angular2/src/facade/collection';
+import {MapWrapper, ListWrapper, List, Map} from 'angular2/src/facade/collection';
 import {PromiseWrapper, Promise} from 'angular2/src/facade/async';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 
 import {Parser, Lexer} from 'angular2/change_detection';
 import {DirectDomRenderer} from 'angular2/src/render/dom/direct_dom_renderer';
 import {Compiler} from 'angular2/src/render/dom/compiler/compiler';
-import {ProtoViewRef, ProtoView, Template, ViewContainerRef, EventDispatcher, DirectiveMetadata} from 'angular2/src/render/api';
+import {ProtoViewRef, ProtoViewDto, ViewDefinition, ViewContainerRef, EventDispatcher, DirectiveMetadata} from 'angular2/src/render/api';
 import {DefaultStepFactory} from 'angular2/src/render/dom/compiler/compile_step_factory';
 import {TemplateLoader} from 'angular2/src/render/dom/compiler/template_loader';
 import {UrlResolver} from 'angular2/src/services/url_resolver';
@@ -19,15 +15,13 @@ import {EventManager, EventManagerPlugin} from 'angular2/src/render/dom/events/e
 import {VmTurnZone} from 'angular2/src/core/zone/vm_turn_zone';
 import {StyleUrlResolver} from 'angular2/src/render/dom/shadow_dom/style_url_resolver';
 import {ViewFactory} from 'angular2/src/render/dom/view/view_factory';
+import {RenderViewHydrator} from 'angular2/src/render/dom/view/view_hydrator';
 
 export class IntegrationTestbed {
   renderer;
   parser;
-  rootEl;
-  rootProtoViewRef;
   eventPlugin;
-  _templates:Map<string, Template>;
-  _compileCache:Map<string, Promise<List>>;
+  _templates:Map<string, ViewDefinition>;
 
   constructor({urlData, viewCacheCapacity, shadowDomStrategy, templates}) {
     this._templates = MapWrapper.create();
@@ -36,7 +30,6 @@ export class IntegrationTestbed {
         MapWrapper.set(this._templates, template.componentId, template);
       });
     }
-    this._compileCache = MapWrapper.create();
     var parser = new Parser(new Lexer());
     var urlResolver = new UrlResolver();
     if (isBlank(shadowDomStrategy)) {
@@ -53,91 +46,74 @@ export class IntegrationTestbed {
     this.eventPlugin = new FakeEventManagerPlugin();
     var eventManager = new EventManager([this.eventPlugin], new FakeVmTurnZone());
     var viewFactory = new ViewFactory(viewCacheCapacity, eventManager, shadowDomStrategy);
-    this.renderer = new DirectDomRenderer(compiler, viewFactory, shadowDomStrategy);
-
-    this.rootEl = el('<div></div>');
-    this.rootProtoViewRef = this.renderer.createRootProtoView(this.rootEl);
+    var viewHydrator = new RenderViewHydrator(eventManager, viewFactory);
+    this.renderer = new DirectDomRenderer(compiler, viewFactory, viewHydrator, shadowDomStrategy);
   }
 
-  compile(templateHtml, directives):Promise<List<ProtoViewRef>> {
-    return this._compileRecurse(new Template({
-      componentId: 'root',
-      inline: templateHtml,
-      directives: directives
-    })).then( (protoViewRefs) => {
-      return this._flattenList([
-        this.renderer.mergeChildComponentProtoViews(this.rootProtoViewRef, [protoViewRefs[0]]),
-        protoViewRefs
+  compileRoot(componentId):Promise<ProtoViewDto> {
+    return this.renderer.createHostProtoView(componentId).then( (rootProtoView) => {
+      return this._compileNestedProtoViews(rootProtoView, [
+        new DirectiveMetadata({
+          type: DirectiveMetadata.COMPONENT_TYPE,
+          id: componentId
+        })
       ]);
     });
   }
 
-  _compileRecurse(template):Promise<List<ProtoViewRef>> {
-    var result = MapWrapper.get(this._compileCache, template.componentId);
-    if (isPresent(result)) {
-      return result;
+  compile(componentId):Promise<ProtoViewDto> {
+    var childTemplate = MapWrapper.get(this._templates, componentId);
+    if (isBlank(childTemplate)) {
+      throw new BaseException(`No template for component ${componentId}`);
     }
-    result = this.renderer.compile(template).then( (pv) => {
-      var childComponentPromises = ListWrapper.map(
-        this._findNestedComponentIds(template, pv),
-        (componentId) => {
-          var childTemplate = MapWrapper.get(this._templates, componentId);
-          if (isBlank(childTemplate)) {
-            throw new BaseException(`Could not find template for ${componentId}!`);
-          }
-          return this._compileRecurse(childTemplate);
-        }
-      );
-      return PromiseWrapper.all(childComponentPromises).then(
-        (protoViewRefsWithChildren) => {
-          var protoViewRefs =
-            ListWrapper.map(protoViewRefsWithChildren, (arr) => arr[0]);
-          return this._flattenList([
-            this.renderer.mergeChildComponentProtoViews(pv.render, protoViewRefs),
-            protoViewRefsWithChildren
-          ]);
-        }
-      );
+    return this.renderer.compile(childTemplate).then( (protoView) => {
+      return this._compileNestedProtoViews(protoView, childTemplate.directives);
     });
-    MapWrapper.set(this._compileCache, template.componentId, result);
-    return result;
   }
 
-  _findNestedComponentIds(template, pv, target = null):List<string> {
-    if (isBlank(target)) {
-      target = [];
-    }
-    for (var binderIdx=0; binderIdx<pv.elementBinders.length; binderIdx++) {
-      var eb = pv.elementBinders[binderIdx];
-      var componentDirective;
-      ListWrapper.forEach(eb.directives, (db) => {
-        var meta = template.directives[db.directiveIndex];
-        if (meta.type === DirectiveMetadata.COMPONENT_TYPE) {
-          componentDirective = meta;
+  _compileNestedProtoViews(protoView, directives):Promise<ProtoViewDto> {
+    var childComponentRenderPvRefs = [];
+    var nestedPVPromises = [];
+    ListWrapper.forEach(protoView.elementBinders, (elementBinder) => {
+      var nestedComponentId = null;
+      ListWrapper.forEach(elementBinder.directives, (db) => {
+        var directiveMeta = directives[db.directiveIndex];
+        if (directiveMeta.type === DirectiveMetadata.COMPONENT_TYPE) {
+          nestedComponentId = directiveMeta.id;
         }
       });
-      if (isPresent(componentDirective)) {
-        ListWrapper.push(target, componentDirective.id);
-      } else if (isPresent(eb.nestedProtoView)) {
-        this._findNestedComponentIds(template, eb.nestedProtoView, target);
+      var nestedCall;
+      if (isPresent(nestedComponentId)) {
+        var childTemplate = MapWrapper.get(this._templates, nestedComponentId);
+        if (isBlank(childTemplate)) {
+          // dynamic component
+          ListWrapper.push(childComponentRenderPvRefs, null);
+        } else {
+          nestedCall = this.compile(nestedComponentId);
+        }
+      } else if (isPresent(elementBinder.nestedProtoView)) {
+        nestedCall = this._compileNestedProtoViews(elementBinder.nestedProtoView, directives);
       }
-    }
-    return target;
-  }
-
-  _flattenList(tree:List, out:List = null):List {
-    if (isBlank(out)) {
-      out = [];
-    }
-    for (var i = 0; i < tree.length; i++) {
-      var item = tree[i];
-      if (ListWrapper.isList(item)) {
-        this._flattenList(item, out);
-      } else {
-        ListWrapper.push(out, item);
+      if (isPresent(nestedCall)) {
+        ListWrapper.push(
+          nestedPVPromises,
+          nestedCall.then( (nestedPv) => {
+            elementBinder.nestedProtoView = nestedPv;
+            if (isPresent(nestedComponentId)) {
+              ListWrapper.push(childComponentRenderPvRefs, nestedPv.render);
+            }
+          })
+        );
       }
+    });
+    if (nestedPVPromises.length > 0) {
+      return PromiseWrapper.all(nestedPVPromises).then((_) => {
+        this.renderer.mergeChildComponentProtoViews(protoView.render, childComponentRenderPvRefs);
+        return protoView;
+      });
+    } else {
+      return PromiseWrapper.resolve(protoView);
     }
-    return out;
   }
 
 }
@@ -151,9 +127,9 @@ class FakeTemplateLoader extends TemplateLoader {
     this._urlData = urlData;
   }
 
-  load(template: Template) {
-    if (isPresent(template.inline)) {
-      return PromiseWrapper.resolve(DOM.createTemplate(template.inline));
+  load(template: ViewDefinition) {
+    if (isPresent(template.template)) {
+      return PromiseWrapper.resolve(DOM.createTemplate(template.template));
     }
 
     if (isPresent(template.absUrl)) {
@@ -199,6 +175,7 @@ export class FakeEventManagerPlugin extends EventManagerPlugin {
 
   addEventListener(element, eventName: string, handler: Function, shouldSupportBubble: boolean) {
     MapWrapper.set(this._eventHandlers, eventName, handler);
+    return () => {MapWrapper.delete(this._eventHandlers, eventName);}
   }
 }
 
@@ -209,7 +186,7 @@ export class LoggingEventDispatcher extends EventDispatcher {
     this.log = [];
   }
   dispatchEvent(
-    elementIndex:number, eventName:string, locals:List<any>
+    elementIndex:number, eventName:string, locals:Map<string, any>
   ) {
     ListWrapper.push(this.log, [elementIndex, eventName, locals]);
   }

@@ -1,41 +1,45 @@
 import {List} from 'angular2/src/facade/collection';
 import {Locals} from './parser/locals';
-import {AST} from './parser/ast';
+import {DEFAULT} from './constants';
+import {BindingRecord} from './binding_record';
 
 export class ProtoChangeDetector  {
-  addAst(ast:AST, bindingMemento:any, directiveMemento:any = null){}
-  instantiate(dispatcher:any, bindingRecords:List, variableBindings:List, directiveMemento:List):ChangeDetector{
+  instantiate(dispatcher:any, bindingRecords:List, variableBindings:List, directiveRecords:List):ChangeDetector{
     return null;
   }
 }
 
+/**
+ * Interface used by Angular to control the change detection strategy for an application.
+ *
+ * Angular implements the following change detection strategies by default:
+ *
+ * - [dynamicChangeDetection]: slower, but does not require `eval()`.
+ * - [jitChangeDetection]: faster, but requires `eval()`.
+ *
+ * In JavaScript, you should always use `jitChangeDetection`, unless you are in an environment that has
+ * [CSP](https://developer.mozilla.org/en-US/docs/Web/Security/CSP), such as a Chrome Extension.
+ *
+ * In Dart, use `dynamicChangeDetection` during development. The Angular transformer generates an analog to the
+ * `jitChangeDetection` strategy at compile time.
+ *
+ *
+ * See: [dynamicChangeDetection], [jitChangeDetection]
+ *
+ * # Example
+ * ```javascript
+ * bootstrap(MyApp, [bind(ChangeDetection).toValue(dynamicChangeDetection)]);
+ * ```
+ * @exportedAs angular2/change_detection
+ */
 export class ChangeDetection {
-  createProtoChangeDetector(name:string, changeControlStrategy:string):ProtoChangeDetector{
+  createProtoChangeDetector(name:string, changeControlStrategy:string=DEFAULT):ProtoChangeDetector{
     return null;
-  }
-}
-
-export class ChangeRecord {
-  bindingMemento:any;
-  change:any;
-
-  constructor(bindingMemento, change) {
-    this.bindingMemento = bindingMemento;
-    this.change = change;
-  }
-
-  //REMOVE IT
-  get currentValue() {
-    return this.change.currentValue;
-  }
-
-  get previousValue() {
-    return this.change.previousValue;
   }
 }
 
 export class ChangeDispatcher {
-  onRecordChange(directiveMemento, records:List<ChangeRecord>) {}
+  notifyOnBinding(bindingRecord:BindingRecord, value:any) {}
 }
 
 export class ChangeDetector {
@@ -43,9 +47,11 @@ export class ChangeDetector {
   mode:string;
 
   addChild(cd:ChangeDetector) {}
+  addShadowDomChild(cd:ChangeDetector) {}
   removeChild(cd:ChangeDetector) {}
+  removeShadowDomChild(cd:ChangeDetector) {}
   remove() {}
-  hydrate(context:any, locals:Locals) {}
+  hydrate(context:any, locals:Locals, directives:any) {}
   dehydrate() {}
   markPathToRootAsCheckOnce() {}
 

@@ -1,8 +1,6 @@
 library angular2.transform.reflection_remover.codegen;
 
 import 'package:analyzer/src/generated/ast.dart';
-import 'package:barback/barback.dart';
-import 'package:code_transformers/resolver.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:angular2/src/transform/common/names.dart';
@@ -12,29 +10,15 @@ class Codegen {
 
   /// The prefix used to import our generated file.
   final String prefix;
-  /// The import uri
-  final String importUri;
+  /// The import uris
+  final Iterable<String> importUris;
 
-  Codegen(String reflectionEntryPointPath, String newEntryPointPath,
+  Codegen(String reflectionEntryPointPath, Iterable<String> newEntryPointPaths,
       {String prefix})
       : this.prefix = prefix == null ? _PREFIX_BASE : prefix,
-        importUri = path.relative(newEntryPointPath,
-            from: path.dirname(reflectionEntryPointPath)) {
+        importUris = newEntryPointPaths.map((p) =>
+            path.relative(p, from: path.dirname(reflectionEntryPointPath))) {
     if (this.prefix.isEmpty) throw new ArgumentError.value('(empty)', 'prefix');
-  }
-
-  factory Codegen.fromResolver(
-      Resolver resolver, AssetId reflectionEntryPoint, AssetId newEntryPoint) {
-    var lib = resolver.getLibrary(reflectionEntryPoint);
-    var prefix = _PREFIX_BASE;
-    var idx = 0;
-    while (lib.imports.any((import) {
-      return import.prefix != null && import.prefix == prefix;
-    })) {
-      prefix = '${_PREFIX_BASE}${idx++}';
-    }
-
-    return new Codegen(reflectionEntryPoint, newEntryPoint, prefix: prefix);
   }
 
   /// Generates code to import the library containing the method which sets up
@@ -43,7 +27,10 @@ class Codegen {
   /// The code generated here should follow the example of code generated for
   /// an [ImportDirective] node.
   String codegenImport() {
-    return 'import \'${importUri}\' as ${prefix};';
+    var count = 0;
+    return importUris
+        .map((importUri) => 'import \'${importUri}\' as ${prefix}${count++};')
+        .join('');
   }
 
   /// Generates code to call the method which sets up Angular2 reflection
@@ -63,7 +50,11 @@ class Codegen {
       reflectorExpression = 'reflector';
     }
 
-    return '${prefix}.${SETUP_METHOD_NAME}(${reflectorExpression});';
+    var count = 0;
+    return importUris
+        .map((_) =>
+            '${prefix}${count++}.${SETUP_METHOD_NAME}(${reflectorExpression});')
+        .join('');
   }
 }
 

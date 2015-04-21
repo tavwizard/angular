@@ -1,6 +1,6 @@
 import {Viewport} from 'angular2/src/core/annotations/annotations';
 import {ViewContainer} from 'angular2/src/core/compiler/view_container';
-import {View} from 'angular2/src/core/compiler/view';
+import {AppView} from 'angular2/src/core/compiler/view';
 import {isPresent, isBlank} from 'angular2/src/facade/lang';
 import {ListWrapper} from 'angular2/src/facade/collection';
 
@@ -22,7 +22,7 @@ import {ListWrapper} from 'angular2/src/facade/collection';
  *
  * ```
  * <ul>
- *   <li *for="error in errors; #i = index">
+ *   <li *for="#error in errors; #i = index">
  *     Error {{i}} of {{errors.length}}: {{error.message}}
  *   </li>
  * </ul>
@@ -34,11 +34,11 @@ import {ListWrapper} from 'angular2/src/facade/collection';
  * - `<li template="for #item of items; #i=index">...</li>`
  * - `<template [for]="#item" [of]="items" #i="index"><li>...</li></template>`
  *
- * @publicModule angular2/directives
+ * @exportedAs angular2/directives
  */
 @Viewport({
   selector: '[for][of]',
-  bind: {
+  properties: {
     'iterableChanges': 'of | iterableDiff'
   }
 })
@@ -114,7 +114,7 @@ export class For  {
 }
 
 class RecordViewTuple {
-  view: View;
+  view: AppView;
   record: any;
   constructor(record, view) {
     this.record = record;

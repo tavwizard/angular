@@ -1,39 +1,37 @@
+import {Injectable} from 'angular2/di';
 import {List, ListWrapper, MapWrapper} from 'angular2/src/facade/collection';
 import {isPresent, isBlank} from 'angular2/src/facade/lang';
 import {reflector} from 'angular2/src/reflection/reflection';
 
 import {ChangeDetection} from 'angular2/change_detection';
-import {ShadowDomStrategy} from './shadow_dom_strategy';
 import {Component, Viewport, DynamicComponent} from '../annotations/annotations';
 
 import * as renderApi from 'angular2/src/render/api';
-import {DirectDomProtoViewRef} from 'angular2/src/render/dom/direct_dom_renderer';
-import {ProtoView} from './view';
+import {AppProtoView} from './view';
 import {ProtoElementInjector, DirectiveBinding} from './element_injector';
 
+@Injectable()
 export class ProtoViewFactory {
   _changeDetection:ChangeDetection;
-  _shadowDomStrategy:ShadowDomStrategy;
 
-  constructor(changeDetection, shadowDomStrategy) {
+  constructor(changeDetection:ChangeDetection) {
     this._changeDetection = changeDetection;
-    this._shadowDomStrategy = shadowDomStrategy;
   }
 
-  createProtoView(componentAnnotation:Component, renderProtoView: renderApi.ProtoView, directives:List<DirectiveBinding>):ProtoView {
-    return this._createProtoView(null, componentAnnotation, renderProtoView, directives);
-  }
-
-  _createProtoView(parent:ProtoView, componentAnnotation:Component, renderProtoView: renderApi.ProtoView, directives:List<DirectiveBinding>):ProtoView {
-    var protoChangeDetector = this._changeDetection.createProtoChangeDetector('dummy',
-      componentAnnotation.changeDetection);
-    var domProtoView = this._getDomProtoView(renderProtoView.render);
-    var protoView = new ProtoView(domProtoView.element, protoChangeDetector,
-        this._shadowDomStrategy, parent);
+  createProtoView(componentBinding:DirectiveBinding, renderProtoView: renderApi.ProtoViewDto, directives:List<DirectiveBinding>):AppProtoView {
+    var protoChangeDetector;
+    if (isBlank(componentBinding)) {
+      protoChangeDetector = this._changeDetection.createProtoChangeDetector('root', null);
+    } else {
+      var componentAnnotation:Component = componentBinding.annotation;
+      protoChangeDetector = this._changeDetection.createProtoChangeDetector(
+        'dummy', componentAnnotation.changeDetection
+      );
+    }
+    var protoView = new AppProtoView(renderProtoView.render, protoChangeDetector);
 
     for (var i=0; i<renderProtoView.elementBinders.length; i++) {
       var renderElementBinder = renderProtoView.elementBinders[i];
-      var domElementBinder = domProtoView.elementBinders[i];
       var sortedDirectives = new SortedDirectives(renderElementBinder.directives, directives);
       var parentPeiWithDistance = this._findParentProtoElementInjectorWithDistance(
         i, protoView.elementBinders, renderProtoView.elementBinders
@@ -42,23 +40,15 @@ export class ProtoViewFactory {
         i, parentPeiWithDistance,
         sortedDirectives, renderElementBinder
       );
-      var elementBinder = this._createElementBinder(
-        protoView, renderElementBinder, domElementBinder, protoElementInjector, sortedDirectives
+      this._createElementBinder(
+        protoView, renderElementBinder, protoElementInjector, sortedDirectives
       );
       this._createDirectiveBinders(protoView, sortedDirectives);
-      if (isPresent(renderElementBinder.nestedProtoView)) {
-        elementBinder.nestedProtoView = this._createProtoView(protoView, componentAnnotation, renderElementBinder.nestedProtoView, directives);
-      }
     }
     MapWrapper.forEach(renderProtoView.variableBindings, (mappedName, varName) => {
       protoView.bindVariable(varName, mappedName);
     });
     return protoView;
-  }
-
-  // This method is needed to make DartAnalyzer happy
-  _getDomProtoView(protoViewRef: DirectDomProtoViewRef) {
-    return protoViewRef.delegate;
   }
 
   _findParentProtoElementInjectorWithDistance(binderIndex, elementBinders, renderElementBinders) {
@@ -105,7 +95,7 @@ export class ProtoViewFactory {
     return protoElementInjector;
   }
 
-  _createElementBinder(protoView, renderElementBinder, domElementBinder, protoElementInjector, sortedDirectives) {
+  _createElementBinder(protoView, renderElementBinder, protoElementInjector, sortedDirectives) {
     var parent = null;
     if (renderElementBinder.parentIndex !== -1) {
       parent = protoView.elementBinders[renderElementBinder.parentIndex];
@@ -117,19 +107,16 @@ export class ProtoViewFactory {
       sortedDirectives.componentDirective,
       sortedDirectives.viewportDirective
     );
-    elBinder.contentTagSelector = domElementBinder.contentTagSelector;
     // text nodes
     for (var i=0; i<renderElementBinder.textBindings.length; i++) {
-      protoView.bindTextNode(domElementBinder.textNodeIndices[i], renderElementBinder.textBindings[i].ast);
+      protoView.bindTextNode(renderElementBinder.textBindings[i].ast);
     }
     // element properties
     MapWrapper.forEach(renderElementBinder.propertyBindings, (astWithSource, propertyName) => {
-      protoView.bindElementProperty(astWithSource.ast, propertyName, MapWrapper.get(domElementBinder.propertySetters, propertyName));
+      protoView.bindElementProperty(astWithSource.ast, propertyName);
     });
     // events
-    MapWrapper.forEach(renderElementBinder.eventBindings, (astWithSource, eventName) => {
-      protoView.bindEvent(eventName, astWithSource.ast, -1);
-    });
+    protoView.bindEvent(renderElementBinder.eventBindings, -1);
     // variables
     // The view's locals needs to have a full set of variable names at construction time
     // in order to prevent new variables from being set later in the lifecycle. Since we don't want
@@ -152,9 +139,7 @@ export class ProtoViewFactory {
         protoView.bindDirectiveProperty(i, astWithSource.ast, propertyName, setter);
       });
       // directive events
-      MapWrapper.forEach(renderDirectiveMetadata.eventBindings, (astWithSource, eventName) => {
-        protoView.bindEvent(eventName, astWithSource.ast, i);
-      });
+      protoView.bindEvent(renderDirectiveMetadata.eventBindings, i);
     }
   }
 

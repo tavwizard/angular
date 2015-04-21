@@ -1,12 +1,12 @@
-var Q = require('q');
+var fs = require('fs');
 var path = require('path');
 var minimatch = require('minimatch');
-var glob = require('glob');
+var path = require('path');
+var Q = require('q');
 
 module.exports = {
   processToPromise: processToPromise,
   streamToPromise: streamToPromise,
-  insertSrcFolder: insertSrcFolder,
   filterByFile: filterByFile,
   subDirs: subDirs,
   forEachSubDir: forEachSubDir,
@@ -14,7 +14,9 @@ module.exports = {
 };
 
 function subDirs(dir) {
-  return [].slice.call(glob.sync('*/', {cwd: dir}));
+  return fs.readdirSync(dir).filter(function(file) {
+    return fs.statSync(path.join(dir, file)).isDirectory();
+  });
 }
 
 function forEachSubDir(dir, callback) {
@@ -75,16 +77,4 @@ function filterByFile(pathMapping, folder) {
   } else {
     throw new Error('No entry for folder '+folder+' found in '+JSON.stringify(pathMapping));
   }
-}
-
-function insertSrcFolder(plugins, srcFolderInsertion) {
-  return plugins.rename(function(file) {
-    var folder = file.dirname;
-    var srcDir = filterByFile(srcFolderInsertion, path.join(folder, file.basename));
-    if (srcDir) {
-      var folderParts = file.dirname.split(path.sep);
-      folder = [folderParts[0], srcDir].concat(folderParts.slice(1)).join(path.sep);
-    }
-    file.dirname = folder;
-  });
 }

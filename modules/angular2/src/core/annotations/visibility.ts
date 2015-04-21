@@ -11,7 +11,7 @@ import {DependencyAnnotationClass} from 'angular2/di';
  * ```
  * @Decorator({
  *   selector: '[dependency]',
- *   bind: {
+ *   properties: {
  *     'id':'dependency'
  *   }
  * })
@@ -40,7 +40,7 @@ import {DependencyAnnotationClass} from 'angular2/di';
  * The `@Parent()` annotation in our constructor forces the injector to retrieve the dependency from the
  * parent element (even thought the current element could resolve it): Angular injects `dependency=1`.
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class ParentAnnotation extends DependencyAnnotationClass {
   //@CONST()
@@ -66,7 +66,7 @@ export function Parent() {
  * ```
  * @Decorator({
  *   selector: '[dependency]',
- *   bind: {
+ *   properties: {
  *     'id':'dependency'
  *   }
  * })
@@ -105,7 +105,7 @@ export function Parent() {
  *
  * Angular injects `dependency=2`.
  *
- * @publicModule angular2/annotations
+ * @exportedAs angular2/annotations
  */
 export class AncestorAnnotation extends DependencyAnnotationClass {
   //@CONST()

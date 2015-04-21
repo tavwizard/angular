@@ -2,28 +2,29 @@ import {Parser, Lexer, ChangeDetector, ChangeDetection, jitChangeDetection}
   from 'angular2/change_detection';
 import {ExceptionHandler} from 'angular2/src/core/exception_handler';
 
-import {bootstrap, Component, Viewport, Template, ViewContainer, Compiler, NgElement, Decorator} from 'angular2/angular2';
+import {bootstrap, Component, Viewport, View, ViewContainer, Compiler, NgElement, Decorator} from 'angular2/angular2';
 
 import {CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
 import {TemplateLoader} from 'angular2/src/render/dom/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
-import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
-import {Content} from 'angular2/src/core/compiler/shadow_dom_emulation/content_tag';
-import {DestinationLightDom} from 'angular2/src/core/compiler/shadow_dom_emulation/light_dom';
+import {ShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/shadow_dom_strategy';
+import {NativeShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/native_shadow_dom_strategy';
+import {EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/emulated_unscoped_shadow_dom_strategy';
 import {LifeCycle} from 'angular2/src/core/life_cycle/life_cycle';
 import {UrlResolver} from 'angular2/src/services/url_resolver';
 import {StyleUrlResolver} from 'angular2/src/render/dom/shadow_dom/style_url_resolver';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {StyleInliner} from 'angular2/src/render/dom/shadow_dom/style_inliner';
-import {PrivateComponentLoader} from 'angular2/src/core/compiler/private_component_loader';
+import {DynamicComponentLoader} from 'angular2/src/core/compiler/dynamic_component_loader';
 import {TestabilityRegistry, Testability} from 'angular2/src/core/testability/testability';
 
 import {reflector} from 'angular2/src/reflection/reflection';
+import {ReflectionCapabilities} from 'angular2/src/reflection/reflection_capabilities';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {isPresent} from 'angular2/src/facade/lang';
 import {window, document, gc} from 'angular2/src/facade/browser';
-import {getIntParameter, bindAction} from 'angular2/src/test_lib/benchmark_util';
+import {getIntParameter, getStringParameter, bindAction} from 'angular2/src/test_lib/benchmark_util';
 
 import {XHR} from 'angular2/src/services/xhr';
 import {XHRImpl} from 'angular2/src/services/xhr_impl';
@@ -32,204 +33,24 @@ import {If} from 'angular2/directives';
 import {BrowserDomAdapter} from 'angular2/src/dom/browser_adapter';
 
 import {EventManager} from 'angular2/src/render/dom/events/event_manager';
+import {ViewFactory, VIEW_POOL_CAPACITY} from 'angular2/src/core/compiler/view_factory';
+import {ProtoViewFactory} from 'angular2/src/core/compiler/proto_view_factory';
+import {Renderer} from 'angular2/src/render/api';
+import {DirectDomRenderer} from 'angular2/src/render/dom/direct_dom_renderer';
+import * as rc from 'angular2/src/render/dom/compiler/compiler';
+import * as rvf from 'angular2/src/render/dom/view/view_factory';
+import {Inject, bind} from 'angular2/di';
+
+function createBindings():List {
+  var viewCacheCapacity = getStringParameter('viewcache') == 'true' ? 10000 : 1;
+  return [
+    bind(rvf.VIEW_POOL_CAPACITY).toValue(viewCacheCapacity),
+    bind(VIEW_POOL_CAPACITY).toValue(viewCacheCapacity)
+  ];
+}
 
 function setupReflector() {
-  // TODO: Put the general calls to reflector.register... in a shared file
-  // as they are needed in all benchmarks...
-
-  reflector.registerType(AppComponent, {
-    'factory': () => new AppComponent(),
-    'parameters': [],
-    'annotations' : [
-      new Component({selector: 'app'}),
-      new Template({
-        directives: [TreeComponent],
-        inline: `<tree [data]='initData'></tree>`
-      })]
-  });
-
-  reflector.registerType(TreeComponent, {
-    'factory': () => new TreeComponent(),
-    'parameters': [],
-    'annotations' : [
-      new Component({
-        selector: 'tree',
-        bind: {'data': 'data'}
-      }),
-      new Template({
-        directives: [TreeComponent, If],
-        inline: `<span> {{data.value}} <span template='if data.right != null'><tree [data]='data.right'></tree></span><span template='if data.left != null'><tree [data]='data.left'></tree></span></span>`
-      })]
-  });
-
-  reflector.registerType(If, {
-    'factory': (vp) => new If(vp),
-    'parameters': [[ViewContainer]],
-    'annotations' : [new Viewport({
-      selector: '[if]',
-      bind: {
-        'condition': 'if'
-      }
-    })]
-  });
-
-  reflector.registerType(Compiler, {
-    'factory': (cd, templateLoader, reader, parser, compilerCache, strategy, tplResolver,
-      cmpUrlMapper, urlResolver) =>
-      new Compiler(cd, templateLoader, reader, parser, compilerCache, strategy, tplResolver,
-        cmpUrlMapper, urlResolver),
-    'parameters': [[ChangeDetection], [TemplateLoader], [DirectiveMetadataReader],
-                   [Parser], [CompilerCache], [ShadowDomStrategy], [TemplateResolver],
-                   [ComponentUrlMapper], [UrlResolver]],
-    'annotations': []
-  });
-
-  reflector.registerType(CompilerCache, {
-    'factory': () => new CompilerCache(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(Parser, {
-    'factory': (lexer) => new Parser(lexer),
-    'parameters': [[Lexer]],
-    'annotations': []
-  });
-
-  reflector.registerType(TemplateLoader, {
-    'factory': (xhr, urlResolver) => new TemplateLoader(xhr, urlResolver),
-    'parameters': [[XHR], [UrlResolver]],
-    'annotations': []
-  });
-
-  reflector.registerType(TemplateResolver, {
-    'factory': () => new TemplateResolver(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(XHR, {
-    'factory': () => new XHRImpl(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(DirectiveMetadataReader, {
-    'factory': () => new DirectiveMetadataReader(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(ShadowDomStrategy, {
-    "factory": (strategy) => strategy,
-    "parameters": [[NativeShadowDomStrategy]],
-    "annotations": []
-  });
-
-  reflector.registerType(NativeShadowDomStrategy, {
-    "factory": (styleUrlResolver) => new NativeShadowDomStrategy(styleUrlResolver),
-    "parameters": [[StyleUrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(EmulatedUnscopedShadowDomStrategy, {
-    "factory": (styleUrlResolver) => new EmulatedUnscopedShadowDomStrategy(styleUrlResolver, null),
-    "parameters": [[StyleUrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(TestabilityRegistry, {
-    "factory": () => new TestabilityRegistry(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(Testability, {
-    "factory": () => new Testability(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(StyleUrlResolver, {
-    "factory": (urlResolver) => new StyleUrlResolver(urlResolver),
-    "parameters": [[UrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(Content, {
-    "factory": (lightDom, el) => new Content(lightDom, el),
-    "parameters": [[DestinationLightDom], [NgElement]],
-    "annotations" : [new Decorator({selector: '[content]'})]
-  });
-
-  reflector.registerType(UrlResolver, {
-    "factory": () => new UrlResolver(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(Lexer, {
-    'factory': () => new Lexer(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(ExceptionHandler, {
-    "factory": () => new ExceptionHandler(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(LifeCycle, {
-    "factory": (exHandler, cd) => new LifeCycle(exHandler, cd),
-    "parameters": [[ExceptionHandler], [ChangeDetector]],
-    "annotations": []
-  });
-
-  reflector.registerType(ComponentUrlMapper, {
-    "factory": () => new ComponentUrlMapper(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(StyleInliner, {
-    "factory": (xhr, styleUrlResolver, urlResolver) =>
-      new StyleInliner(xhr, styleUrlResolver, urlResolver),
-    "parameters": [[XHR], [StyleUrlResolver], [UrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(EventManager, {
-    "factory": () => new EventManager([], null),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(PrivateComponentLoader, {
-    "factory": (compiler, strategy, eventMgr, reader) =>
-      new PrivateComponentLoader(compiler, strategy, eventMgr, reader),
-    "parameters": [[Compiler], [ShadowDomStrategy], [EventManager], [DirectiveMetadataReader]],
-    "annotations": []
-  });
-
-  reflector.registerGetters({
-    'value': (a) => a.value,
-    'left': (a) => a.left,
-    'right': (a) => a.right,
-    'initData': (a) => a.initData,
-    'data': (a) => a.data,
-    'condition': (a) => a.condition,
-  });
-
-  reflector.registerSetters({
-    'value': (a,v) => a.value = v,
-    'left': (a,v) => a.left = v,
-    'right': (a,v) => a.right = v,
-    'initData': (a,v) => a.initData = v,
-    'data': (a,v) => a.data = v,
-    'condition': (a,v) => a.condition = v,
-    'if': (a,v) => a['if'] = v,
-  });
+  reflector.reflectionCapabilities = new ReflectionCapabilities();
 }
 
 var BASELINE_TREE_TEMPLATE;
@@ -299,7 +120,8 @@ export function main() {
   function noop() {}
 
   function initNg2() {
-    bootstrap(AppComponent).then((injector) => {
+    bootstrap(AppComponent, createBindings()).then((ref) => {
+      var injector = ref.injector;
       lifeCycle = injector.get(LifeCycle);
 
       app = injector.get(AppComponent);
@@ -428,6 +250,11 @@ class BaseLineIf {
   }
 }
 
+@Component({selector: 'app'})
+@View({
+  directives: [TreeComponent],
+  template: `<tree [data]='initData'></tree>`
+})
 class AppComponent {
   initData:TreeNode;
   constructor() {
@@ -437,6 +264,14 @@ class AppComponent {
   }
 }
 
+@Component({
+  selector: 'tree',
+  properties: {'data': 'data'}
+})
+@View({
+  directives: [TreeComponent, If],
+  template: `<span> {{data.value}} <span template='if data.right != null'><tree [data]='data.right'></tree></span><span template='if data.left != null'><tree [data]='data.left'></tree></span></span>`
+})
 class TreeComponent {
   data:TreeNode;
 }

@@ -1,4 +1,4 @@
-import {OpaqueToken} from 'angular2/di';
+import {OpaqueToken, Inject, Injectable} from 'angular2/di';
 import {int, isPresent, isBlank, BaseException} from 'angular2/src/facade/lang';
 import {ListWrapper, MapWrapper, Map, StringMapWrapper, List} from 'angular2/src/facade/collection';
 
@@ -8,55 +8,62 @@ import {Content} from '../shadow_dom/content_tag';
 import {ShadowDomStrategy} from '../shadow_dom/shadow_dom_strategy';
 import {EventManager} from 'angular2/src/render/dom/events/event_manager';
 
-import {ViewContainer} from './view_container';
-import {ProtoView} from './proto_view';
-import {View} from './view';
+import * as vcModule from './view_container';
+import * as pvModule from './proto_view';
+import * as viewModule from './view';
 import {NG_BINDING_CLASS_SELECTOR, NG_BINDING_CLASS} from '../util';
 
-export var VIEW_POOL_CAPACITY = new OpaqueToken('ViewFactory.viewPoolCapacity');
+// TODO(tbosch): Make this an OpaqueToken as soon as our transpiler supports this!
+export const VIEW_POOL_CAPACITY = 'render.ViewFactory.viewPoolCapacity';
 
-
+@Injectable()
 export class ViewFactory {
-  _poolCapacity:number;
-  _pooledViews:List<View>;
+  _poolCapacityPerProtoView:number;
+  _pooledViewsPerProtoView:Map<pvModule.RenderProtoView, List<viewModule.RenderView>>;
   _eventManager:EventManager;
   _shadowDomStrategy:ShadowDomStrategy;
 
-  constructor(capacity, eventManager, shadowDomStrategy) {
-    this._poolCapacity = capacity;
-    this._pooledViews = ListWrapper.create();
+  constructor(@Inject(VIEW_POOL_CAPACITY) poolCapacityPerProtoView,
+      eventManager:EventManager, shadowDomStrategy:ShadowDomStrategy) {
+    this._poolCapacityPerProtoView = poolCapacityPerProtoView;
+    this._pooledViewsPerProtoView = MapWrapper.create();
     this._eventManager = eventManager;
     this._shadowDomStrategy = shadowDomStrategy;
   }
 
-  getView(protoView:ProtoView):View {
-    // TODO(tbosch): benchmark this scanning of views and maybe
-    // replace it with a fancy LRU Map/List combination...
-    var view;
-    for (var i=0; i<this._pooledViews.length; i++) {
-      var pooledView = this._pooledViews[i];
-      if (pooledView.proto === protoView) {
-        view = ListWrapper.removeAt(this._pooledViews, i);
+  createInPlaceHostView(hostElementSelector, hostProtoView:pvModule.RenderProtoView):viewModule.RenderView {
+    return this._createView(hostProtoView, hostElementSelector);
+  }
+
+  getView(protoView:pvModule.RenderProtoView):viewModule.RenderView {
+    var pooledViews = MapWrapper.get(this._pooledViewsPerProtoView, protoView);
+    if (isPresent(pooledViews)) {
+      var result = ListWrapper.removeLast(pooledViews);
+      if (pooledViews.length === 0) {
+        MapWrapper.delete(this._pooledViewsPerProtoView, protoView);
       }
+      return result;
     }
-    if (isBlank(view)) {
-      view = this._createView(protoView);
-    }
-    return view;
+    return this._createView(protoView, null);
   }
 
-  returnView(view:View) {
-    if (view.hydrated()) {
-      view.dehydrate();
+  returnView(view:viewModule.RenderView) {
+    if (view.hydrated) {
+      throw new BaseException('View is still hydrated');
     }
-    ListWrapper.push(this._pooledViews, view);
-    while (this._pooledViews.length > this._poolCapacity) {
-      ListWrapper.removeAt(this._pooledViews, 0);
+    var protoView = view.proto;
+    var pooledViews = MapWrapper.get(this._pooledViewsPerProtoView, protoView);
+    if (isBlank(pooledViews)) {
+      pooledViews = [];
+      MapWrapper.set(this._pooledViewsPerProtoView, protoView, pooledViews);
+    }
+    if (pooledViews.length < this._poolCapacityPerProtoView) {
+      ListWrapper.push(pooledViews, view);
     }
   }
 
-  _createView(protoView:ProtoView): View {
-    var rootElementClone = protoView.isRootView ? protoView.element : DOM.importIntoDoc(protoView.element);
+  _createView(protoView:pvModule.RenderProtoView, inplaceElement): viewModule.RenderView {
+    var rootElementClone = isPresent(inplaceElement) ? inplaceElement : DOM.importIntoDoc(protoView.element);
     var elementsWithBindingsDynamic;
     if (protoView.isTemplateElement) {
       elementsWithBindingsDynamic = DOM.querySelectorAll(DOM.content(rootElementClone), NG_BINDING_CLASS_SELECTOR);
@@ -72,7 +79,7 @@ export class ViewFactory {
     var viewRootNodes;
     if (protoView.isTemplateElement) {
       var childNode = DOM.firstChild(DOM.content(rootElementClone));
-      viewRootNodes = []; // TODO(perf): Should be fixed size, since we could pre-compute in in ProtoView
+      viewRootNodes = []; // TODO(perf): Should be fixed size, since we could pre-compute in in pvModule.RenderProtoView
       // Note: An explicit loop is the fastest way to convert a DOM array into a JS array!
       while(childNode != null) {
         ListWrapper.push(viewRootNodes, childNode);
@@ -81,7 +88,6 @@ export class ViewFactory {
     } else {
       viewRootNodes = [rootElementClone];
     }
-
     var binders = protoView.elementBinders;
     var boundTextNodes = [];
     var boundElements = ListWrapper.createFixedSize(binders.length);
@@ -108,7 +114,7 @@ export class ViewFactory {
       // viewContainers
       var viewContainer = null;
       if (isBlank(binder.componentId) && isPresent(binder.nestedProtoView)) {
-        viewContainer = new ViewContainer(this, element);
+        viewContainer = new vcModule.ViewContainer(element);
       }
       viewContainers[binderIdx] = viewContainer;
 
@@ -120,7 +126,7 @@ export class ViewFactory {
       contentTags[binderIdx] = contentTag;
     }
 
-    var view = new View(
+    var view = new viewModule.RenderView(
       protoView, viewRootNodes,
       boundTextNodes, boundElements, viewContainers, contentTags
     );
@@ -130,21 +136,17 @@ export class ViewFactory {
       var element = boundElements[binderIdx];
 
       // static child components
-      if (isPresent(binder.componentId) && isPresent(binder.nestedProtoView)) {
-        var childView = this._createView(binder.nestedProtoView);
-        view.setComponentView(this._shadowDomStrategy, binderIdx, childView);
+      if (binder.hasStaticComponent()) {
+        var childView = this._createView(binder.nestedProtoView, null);
+        this.setComponentView(view, binderIdx, childView);
       }
 
       // events
-      if (isPresent(binder.eventLocals)) {
-        ListWrapper.forEach(binder.eventNames, (eventName) => {
-          this._createEventListener(view, element, binderIdx, eventName, binder.eventLocals);
-        });
+      if (isPresent(binder.eventLocals) && isPresent(binder.localEvents)) {
+        for (var i = 0; i < binder.localEvents.length; i++) {
+          this._createEventListener(view, element, binderIdx, binder.localEvents[i].name, binder.eventLocals);
+        }
       }
-    }
-
-    if (protoView.isRootView) {
-      view.hydrate(null);
     }
 
     return view;
@@ -154,5 +156,16 @@ export class ViewFactory {
     this._eventManager.addEventListener(element, eventName, (event) => {
       view.dispatchEvent(elementIndex, eventName, event);
     });
+  }
+
+  // This method is used by the ViewFactory and the ViewHydrator
+  // TODO(tbosch): change shadow dom emulation so that LightDom
+  // instances don't need to be recreated by instead hydrated/dehydrated
+  setComponentView(hostView:viewModule.RenderView, elementIndex:number, componentView:viewModule.RenderView) {
+    var element = hostView.boundElements[elementIndex];
+    var lightDom = this._shadowDomStrategy.constructLightDom(hostView, componentView, element);
+    this._shadowDomStrategy.attachTemplate(element, componentView);
+    hostView.lightDoms[elementIndex] = lightDom;
+    hostView.componentChildViews[elementIndex] = componentView;
   }
 }

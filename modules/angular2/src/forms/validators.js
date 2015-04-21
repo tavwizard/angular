@@ -4,7 +4,15 @@ import {List, ListWrapper, StringMapWrapper} from 'angular2/src/facade/collectio
 import * as modelModule from './model';
 
 /**
- * @publicModule angular2/forms
+ * Provides a set of validators used by form controls.
+ *
+ * # Example
+ *
+ * ```
+ * var loginControl = new Control("", Validators.required)
+ * ```
+ *
+ * @exportedAs angular2/forms
  */
 export class Validators {
   static required(c:modelModule.Control) {

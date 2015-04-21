@@ -1,38 +1,48 @@
-import {MapWrapper, Map} from 'angular2/src/facade/collection';
-import {int, isPresent} from 'angular2/src/facade/lang';
+import {MapWrapper} from 'angular2/src/facade/collection';
+//import {int} from 'angular2/src/facade/lang';
 
-export class KeyMetadataError {
-  constructor () { Error.call(this); }
-}
-KeyMetadataError.prototype = Error;
+// TODO: uncoment `int` once https://github.com/angular/angular/issues/1414 is fixed
 
+/**
+ * A unique object used for retrieving items from the Injector.
+ *
+ * [Key]s have:
+ * - system wide unique [id].
+ * - [token] usually the [Type] of the instance.
+ *
+ * [Key]s are used internaly in [Injector] becouse they have system wide unique [id]s which allow the injector to
+ * index in arrays rather ther look up items in maps.
+ *
+ * @exportedAs angular2/di
+ */
 export class Key {
   token;
-  id:int;
+  id/* :int */;
   metadata:any;
-  constructor(token, id:int) {
+  constructor(token, id/* :int */) {
     this.token = token;
     this.id = id;
     this.metadata = null;
   }
 
-  static setMetadata(key:Key, metadata):Key {
-    if (isPresent(key.metadata) && key.metadata !== metadata) {
-      throw new KeyMetadataError();
-    }
-    key.metadata = metadata;
-    return key;
-  }
-
+  /**
+   * Retrieve a [Key] for a token.
+   */
   static get(token):Key {
     return _globalKeyRegistry.get(token);
   }
 
-  static get numberOfKeys():int {
+  /**
+   * @returns number of [Key]s registered in the system.
+   */
+  static get numberOfKeys()/* :int */ {
     return _globalKeyRegistry.numberOfKeys;
   }
 }
 
+/**
+ * @private
+ */
 export class KeyRegistry {
   _allKeys:Map<any,Key>;
   constructor() {
@@ -51,7 +61,7 @@ export class KeyRegistry {
     return newKey;
   }
 
-  get numberOfKeys():int {
+  get numberOfKeys()/* :int */ {
     return MapWrapper.size(this._allKeys);
   }
 }

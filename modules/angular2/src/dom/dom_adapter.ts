@@ -39,6 +39,9 @@ export class DomAdapter {
   on(el, evt, listener) {
     throw _abstract();
   }
+  onAndCancel(el, evt, listener): Function {
+    throw _abstract();
+  }
   dispatchEvent(el, evt) {
     throw _abstract();
   }
@@ -192,7 +195,7 @@ export class DomAdapter {
   attributeMap(element): Map<any,any> {
     throw _abstract();
   }
-  getAttribute(element, attribute:string) {
+  getAttribute(element, attribute:string):string {
     throw _abstract();
   }
   setAttribute(element, name:string, value:string) {
@@ -208,6 +211,9 @@ export class DomAdapter {
     throw _abstract();
   }
   defaultDoc(): Document {
+    throw _abstract();
+  }
+  getBoundingClientRect(el) {
     throw _abstract();
   }
   getTitle():string {
@@ -255,6 +261,9 @@ export class DomAdapter {
   getHref(element): string {
     throw _abstract();
   }
+  getEventKey(event): string {
+    throw _abstract();
+  }
   resolveAndSetHref(element, baseUrl:string, href:string) {
     throw _abstract();
   }
@@ -265,6 +274,9 @@ export class DomAdapter {
     throw _abstract();
   }
   supportsNativeShadowDOM(): boolean {
+    throw _abstract();
+  }
+  getGlobalEventTarget(target:string) {
     throw _abstract();
   }
 }

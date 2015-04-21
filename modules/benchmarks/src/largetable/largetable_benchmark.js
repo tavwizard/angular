@@ -2,24 +2,25 @@ import {Parser, Lexer, ChangeDetector, ChangeDetection, jitChangeDetection}
 from 'angular2/change_detection';
 import {ExceptionHandler} from 'angular2/src/core/exception_handler';
 
-import {bootstrap, Component, Viewport, Template, ViewContainer, Compiler, NgElement, Decorator} from 'angular2/angular2';
+import {bootstrap, Component, Viewport, View, ViewContainer, Compiler, NgElement, Decorator} from 'angular2/angular2';
 
 import {CompilerCache} from 'angular2/src/core/compiler/compiler';
 import {DirectiveMetadataReader} from 'angular2/src/core/compiler/directive_metadata_reader';
 import {TemplateLoader} from 'angular2/src/render/dom/compiler/template_loader';
 import {TemplateResolver} from 'angular2/src/core/compiler/template_resolver';
-import {ShadowDomStrategy, NativeShadowDomStrategy, EmulatedUnscopedShadowDomStrategy} from 'angular2/src/core/compiler/shadow_dom_strategy';
-import {Content} from 'angular2/src/core/compiler/shadow_dom_emulation/content_tag';
-import {DestinationLightDom} from 'angular2/src/core/compiler/shadow_dom_emulation/light_dom';
+import {ShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/shadow_dom_strategy';
+import {NativeShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/native_shadow_dom_strategy';
+import {EmulatedUnscopedShadowDomStrategy} from 'angular2/src/render/dom/shadow_dom/emulated_unscoped_shadow_dom_strategy';
 import {LifeCycle} from 'angular2/src/core/life_cycle/life_cycle';
 import {UrlResolver} from 'angular2/src/services/url_resolver';
 import {StyleUrlResolver} from 'angular2/src/render/dom/shadow_dom/style_url_resolver';
 import {ComponentUrlMapper} from 'angular2/src/core/compiler/component_url_mapper';
 import {StyleInliner} from 'angular2/src/render/dom/shadow_dom/style_inliner';
-import {PrivateComponentLoader} from 'angular2/src/core/compiler/private_component_loader';
+import {DynamicComponentLoader} from 'angular2/src/core/compiler/dynamic_component_loader';
 import {TestabilityRegistry, Testability} from 'angular2/src/core/testability/testability';
 
 import {reflector} from 'angular2/src/reflection/reflection';
+import {ReflectionCapabilities} from 'angular2/src/reflection/reflection_capabilities';
 import {DOM} from 'angular2/src/dom/dom_adapter';
 import {isPresent, BaseException} from 'angular2/src/facade/lang';
 import {window, document, gc} from 'angular2/src/facade/browser';
@@ -36,308 +37,40 @@ import {EventManager} from 'angular2/src/render/dom/events/event_manager';
 import {ListWrapper} from 'angular2/src/facade/collection';
 import {Parent} from 'angular2/src/core/annotations/visibility';
 
+import {ViewFactory, VIEW_POOL_CAPACITY} from 'angular2/src/core/compiler/view_factory';
+import {ProtoViewFactory} from 'angular2/src/core/compiler/proto_view_factory';
+import {Renderer} from 'angular2/src/render/api';
+import {DirectDomRenderer} from 'angular2/src/render/dom/direct_dom_renderer';
+import * as rc from 'angular2/src/render/dom/compiler/compiler';
+import * as rvf from 'angular2/src/render/dom/view/view_factory';
+import {Inject, bind} from 'angular2/di';
+
+export const BENCHMARK_TYPE = 'LargetableComponent.benchmarkType';
+export const LARGETABLE_ROWS = 'LargetableComponent.rows';
+export const LARGETABLE_COLS = 'LargetableComponent.cols';
+function _createBindings() {
+  return [
+    bind(BENCHMARK_TYPE).toValue(getStringParameter('benchmarkType')),
+    bind(LARGETABLE_ROWS).toValue(getIntParameter('rows')),
+    bind(LARGETABLE_COLS).toValue(getIntParameter('columns'))
+  ];
+}
+
 var BASELINE_LARGETABLE_TEMPLATE;
 
 function setupReflector() {
-  // TODO: Put the general calls to reflector.register... in a shared file
-  // as they are needed in all benchmarks...
+  reflector.reflectionCapabilities = new ReflectionCapabilities();
 
-  reflector.registerType(AppComponent, {
-    'factory': () => new AppComponent(),
-    'parameters': [],
-    'annotations': [
-        new Component({
-            selector: 'app'
-
-        }),
-        new Template({
-            directives: [LargetableComponent],
-            inline: `<largetable [data]='data' [benchmarkType]='benchmarkType'></largetable>`
-        })]
-  });
-
-  reflector.registerType(LargetableComponent, {
-    'factory': () => new LargetableComponent(getStringParameter('benchmarkType'),
-        getIntParameter('rows'), getIntParameter('columns')),
-    'parameters': [],
-    'annotations': [
-        new Component({
-            selector: 'largetable',
-            bind: {
-                'data': 'data',
-                'benchmarkType': 'benchmarktype'
-              }
-        }),
-        new Template({
-            directives: [For, Switch, SwitchWhen, SwitchDefault],
-            inline: `
-                <table [switch]="benchmarkType">
-                  <tbody template="switch-when 'interpolation'">
-                    <tr template="for #row of data">
-                      <td template="for #column of row">
-                        {{column.i}}:{{column.j}}|
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tbody template="switch-when 'interpolationAttr'">
-                    <tr template="for #row of data">
-                      <td template="for #column of row" i="{{column.i}}" j="{{column.j}}">
-                        i,j attrs
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tbody template="switch-when 'interpolationFn'">
-                    <tr template="for #row of data">
-                      <td template="for #column of row">
-                        {{column.iFn()}}:{{column.jFn()}}|
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tbody template="switch-default">
-                    <tr>
-                      <td>
-                        <em>{{benchmarkType}} not yet implemented</em>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>`
-        })
-    ]
-  });
-
-  reflector.registerType(If, {
-    'factory': (vp) => new If(vp),
-    'parameters': [[ViewContainer]],
-    'annotations' : [new Viewport({
-      selector: '[if]',
-      bind: {
-        'condition': 'if'
-      }
-    })]
-  });
-
-  reflector.registerType(For, {
-    'factory': (vp) => new For(vp),
-    'parameters': [[ViewContainer]],
-    'annotations' : [new Viewport({
-      selector: '[for]',
-      bind: {
-        'iterableChanges': 'of | iterableDiff'
-      }
-    })]
-  });
-
-  reflector.registerType(Switch, {
-    'factory': () => new Switch(),
-    'parameters': [],
-    'annotations' : [new Decorator({
-      selector: '[switch]',
-      bind: {
-        'value': 'switch'
-      }
-    })]
-  });
-
-  reflector.registerType(SwitchWhen, {
-    'factory': (el, vc, ss) => new SwitchWhen(el, vc, ss),
-    'parameters': [[NgElement],[ViewContainer],[Switch, new Parent()]],
-    'annotations' : [new Viewport({
-        selector: '[switch-when]',
-        bind: {
-          'when': 'switch-when'
-        }
-      })]
-  });
-
-  reflector.registerType(SwitchDefault, {
-    'factory': (vc, ss) => new SwitchDefault(vc, ss),
-    'parameters': [[ViewContainer],[Switch, new Parent()]],
-    'annotations' : [new Viewport({
-        selector: '[switch-default]'
-      })]
-  });
-
-  reflector.registerType(Compiler, {
-    'factory': (cd, templateLoader, reader, parser, compilerCache, strategy, tplResolver,
-      cmpUrlMapper, urlResolver) =>
-      new Compiler(cd, templateLoader, reader, parser, compilerCache, strategy, tplResolver,
-        cmpUrlMapper, urlResolver),
-    'parameters': [[ChangeDetection], [TemplateLoader], [DirectiveMetadataReader],
-                   [Parser], [CompilerCache], [ShadowDomStrategy], [TemplateResolver],
-                   [ComponentUrlMapper], [UrlResolver]],
-    'annotations': []
-  });
-
-  reflector.registerType(CompilerCache, {
-    'factory': () => new CompilerCache(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(Parser, {
-    'factory': (lexer) => new Parser(lexer),
-    'parameters': [[Lexer]],
-    'annotations': []
-  });
-
-  reflector.registerType(TemplateLoader, {
-    'factory': (xhr, urlResolver) => new TemplateLoader(xhr, urlResolver),
-    'parameters': [[XHR], [UrlResolver]],
-    'annotations': []
-  });
-
-  reflector.registerType(TemplateResolver, {
-    'factory': () => new TemplateResolver(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(XHR, {
-    'factory': () => new XHRImpl(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(DirectiveMetadataReader, {
-    'factory': () => new DirectiveMetadataReader(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(ShadowDomStrategy, {
-    "factory": (strategy) => strategy,
-    "parameters": [[NativeShadowDomStrategy]],
-    "annotations": []
-  });
-
-  reflector.registerType(NativeShadowDomStrategy, {
-    "factory": (styleUrlResolver) => new NativeShadowDomStrategy(styleUrlResolver),
-    "parameters": [[StyleUrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(EmulatedUnscopedShadowDomStrategy, {
-    "factory": (styleUrlResolver) => new EmulatedUnscopedShadowDomStrategy(styleUrlResolver, null),
-    "parameters": [[StyleUrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(StyleUrlResolver, {
-    "factory": (urlResolver) => new StyleUrlResolver(urlResolver),
-    "parameters": [[UrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(TestabilityRegistry, {
-    "factory": () => new TestabilityRegistry(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(Testability, {
-    "factory": () => new Testability(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(Content, {
-    "factory": (lightDom, el) => new Content(lightDom, el),
-    "parameters": [[DestinationLightDom], [NgElement]],
-    "annotations" : [new Decorator({selector: '[content]'})]
-  });
-
-  reflector.registerType(UrlResolver, {
-    "factory": () => new UrlResolver(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(Lexer, {
-    'factory': () => new Lexer(),
-    'parameters': [],
-    'annotations': []
-  });
-
-  reflector.registerType(ExceptionHandler, {
-    "factory": () => new ExceptionHandler(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(LifeCycle, {
-    "factory": (exHandler, cd) => new LifeCycle(exHandler, cd),
-    "parameters": [[ExceptionHandler], [ChangeDetector]],
-    "annotations": []
-  });
-
-  reflector.registerType(ComponentUrlMapper, {
-    "factory": () => new ComponentUrlMapper(),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(StyleInliner, {
-    "factory": (xhr, styleUrlResolver, urlResolver) =>
-      new StyleInliner(xhr, styleUrlResolver, urlResolver),
-    "parameters": [[XHR], [StyleUrlResolver], [UrlResolver]],
-    "annotations": []
-  });
-
-  reflector.registerType(EventManager, {
-    "factory": () => new EventManager([], null),
-    "parameters": [],
-    "annotations": []
-  });
-
-  reflector.registerType(PrivateComponentLoader, {
-    "factory": (compiler, strategy, eventMgr, reader) =>
-      new PrivateComponentLoader(compiler, strategy, eventMgr, reader),
-    "parameters": [[Compiler], [ShadowDomStrategy], [EventManager], [DirectiveMetadataReader]],
-    "annotations": []
-  });
-
-
+  // TODO(kegluneq): Generate these.
   reflector.registerGetters({
-    'data': (a) => a.data,
-    'benchmarkType': (a) => a.benchmarkType,
-    'benchmarktype': (a) => a.benchmarktype,
-    'when': (a) => a.when,
-    'switchWhen': (a) => a.switchWhen,
-    'switchwhen': (a) => a.switchwhen,
-    'value': (a) => a.value,
-    'iterable': (a) => a.iterable,
-    'iterableChanges': (a) => a.iterableChanges,
-    'row': (a) => a.row,
-    'column': (a) => a.column,
-    'i': (a) => a.i,
-    'j': (a) => a.j,
-    'switch': (a) => {throw new BaseException('not implemented, reserved word in dart')},
-    'for': (a) => {throw new BaseException('not implemented, reserved word in dart')},
-    'of': (a) => a.of
+    'benchmarktype': (o) => o.benchmarktype,
+    'switch': (o) => null,
+    'switchWhen': (o) => o.switchWhen
   });
-
-  reflector.registerMethods({
-    'iFn': (a, args) => a.iFn(),
-    'jFn': (a, args) => a.jFn(),
-  })
-
   reflector.registerSetters({
-    'data': (a,v) => a.data = v,
-    'benchmarkType': (a,v) => a.benchmarkType = v,
-    'benchmarktype': (a,v) => a.benchmarktype = v,
-    'when': (a,v) => a.when = v,
-    'switchWhen': (a,v) => a.switchWhen = v,
-    'switchwhen': (a,v) => a.switchwhen = v,
-    'value': (a,v) => a.value = v,
-    'iterable': (a,v) => a.iterable = v,
-    'iterableChanges': (a,v) => a.iterableChanges = v,
-    'row': (a,v) => a.row = v,
-    'column': (a,v) => a.column = v,
-    'i': (a,v) => a.i = v,
-    'j': (a,v) => a.j = v,
-    'switch': (a,v) => {throw new BaseException('not implemented, reserved word in dart')},
-    'for': (a,v) => {throw new BaseException('not implemented, reserved word in dart')},
-    'of': (a,v) => a.j = v
+    'benchmarktype': (o, v) => o.benchmarktype = v,
+    'switch': (o, v) => null,
+    'switchWhen': (o, v) => o.switchWhen = v
   });
 }
 
@@ -409,7 +142,8 @@ export function main() {
   function noop() {}
 
   function initNg2() {
-    bootstrap(AppComponent).then((injector) => {
+    bootstrap(AppComponent, _createBindings()).then((ref) => {
+      var injector = ref.injector;
       app = injector.get(AppComponent);
       lifecycle = injector.get(LifeCycle);
       bindAction('#ng2DestroyDom', ng2DestroyDom);
@@ -509,17 +243,68 @@ class CellData {
   }
 }
 
+@Component({
+  selector: 'app'
+})
+@View({
+  directives: [LargetableComponent],
+  template: `<largetable [data]='data' [benchmarkType]='benchmarkType'></largetable>`
+})
 class AppComponent {
   data;
   benchmarkType:string;
 }
 
+@Component({
+  selector: 'largetable',
+  properties: {
+      'data': 'data',
+      'benchmarkType': 'benchmarktype'
+  }
+})
+@View({
+  directives: [For, Switch, SwitchWhen, SwitchDefault],
+  template: `
+      <table [switch]="benchmarkType">
+        <tbody template="switch-when 'interpolation'">
+          <tr template="for #row of data">
+            <td template="for #column of row">
+              {{column.i}}:{{column.j}}|
+            </td>
+          </tr>
+        </tbody>
+        <tbody template="switch-when 'interpolationAttr'">
+          <tr template="for #row of data">
+            <td template="for #column of row" i="{{column.i}}" j="{{column.j}}">
+              i,j attrs
+            </td>
+          </tr>
+        </tbody>
+        <tbody template="switch-when 'interpolationFn'">
+          <tr template="for #row of data">
+            <td template="for #column of row">
+              {{column.iFn()}}:{{column.jFn()}}|
+            </td>
+          </tr>
+        </tbody>
+        <tbody template="switch-default">
+          <tr>
+            <td>
+              <em>{{benchmarkType}} not yet implemented</em>
+            </td>
+          </tr>
+        </tbody>
+      </table>`
+})
 class LargetableComponent {
   data;
   benchmarkType:string;
   rows:number;
   columns:number;
-  constructor(benchmarkType:string,rows:number,columns:number) {
+  constructor(
+      @Inject(BENCHMARK_TYPE) benchmarkType,
+      @Inject(LARGETABLE_ROWS) rows,
+      @Inject(LARGETABLE_COLS) columns) {
     this.benchmarkType = benchmarkType;
     this.rows = rows;
     this.columns = columns;

@@ -1,4 +1,4 @@
-import {bootstrap, Component, Decorator, Template, NgElement} from 'angular2/angular2';
+import {bootstrap, Component, Decorator, View, NgElement} from 'angular2/angular2';
 import {Injectable} from 'angular2/di';
 
 // Angular 2.0 supports 3 basic types of directives:
@@ -16,14 +16,14 @@ import {Injectable} from 'angular2/di';
   selector: 'hello-app',
   // These are services that would be created if a class in the component's
   // template tries to inject them.
-  services: [GreetingService]
+  injectables: [GreetingService]
 })
 // The template for the component.
-@Template({
+@View({
   // Expressions in the template (like {{greeting}}) are evaluated in the
   // context of the HelloCmp class below.
-  inline: `<div class="greeting">{{greeting}} <span red>world</span>!</div>
-           <button class="changeButton" (click)="changeGreeting()">change greeting</button>`,
+  template: `<div class="greeting">{{greeting}} <span red>world</span>!</div>
+           <button class="changeButton" (click)="changeGreeting()">change greeting</button><content></content>`,
   // All directives used in the template need to be specified. This allows for
   // modularity (RedDec can only be used in this template)
   // and better tooling (the template can be invalidated if the attribute is

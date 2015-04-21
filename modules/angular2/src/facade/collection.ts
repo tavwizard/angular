@@ -12,7 +12,7 @@ export type StringMap = Object;
 
 export class MapWrapper {
   static create(): Map<any, any> { return new Map(); }
-  static clone<K, V>(m: Map<K, V>): Map<K, V> { return new Map(m); }
+  static clone<TK, TV>(m: Map<TK, TV>): Map<TK, TV> { return new Map(m); }
   static createFromStringMap(stringMap): Map<string, any> {
     var result = MapWrapper.create();
     for (var prop in stringMap) {
@@ -21,8 +21,8 @@ export class MapWrapper {
     return result;
   }
   static createFromPairs(pairs: List<any>): Map<any, any> { return new Map(pairs); }
-  static get(m, k) { return m.get(k); }
-  static set(m, k, v) { m.set(k, v); }
+  static get<TK,TV>(m:Map<TK,TV>, k:TK): TV { return m.get(k); }
+  static set<TK,TV>(m:Map<TK,TV>, k:TK, v:TV) { m.set(k, v); }
   static contains(m, k) { return m.has(k); }
   static forEach(m, fn) { m.forEach(fn); }
   static size(m) { return m.size; }
